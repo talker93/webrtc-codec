@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Codec Demo</title>
+  </head>
+  <body>
+    <!-- <div id="app"></div> -->
+    
+    <div>
+      <h1>Step 1: start your webcam</h1>
+      <h2>Local Stream Setting</h2>
+      <div class="select">
+        <input type="checkbox" id="muteMonitor" value="yes" checked="true">
+        <label>Mute Monitoring Signal</label>
+      </div>
+      <div class="select">
+        <input type="checkbox" id="muteMe" value="yes" checked="true">
+        <label>Mute Myself</label>
+      </div>
+      <div class="select">
+        <label>Audio input source: </label>
+        <select id="audioSource"></select>
+      </div>
+      <div>
+        <div class="label">Local Audio player</div>
+        <audio id="webcamVideo" autuplay controls></audio>
+      </div>
+      <h2>Remote Stream Setting</h2>
+      <div class="select">
+        <label>Audio output destination: </label>
+        <select id="audioOutput"></select>
+      </div>
+      <div>
+        <div class="label">Remote Audio Player</div>
+        <audio id="remoteVideo" autoplay controls></audio>
+      </div>
+      <button id="webcamButton">Start Devices</button>
+    </div>
+
+    <div>
+      <h2>Step 2: create a call</h2>
+      <button id="callButton" disabled>Create Call</button>
+    </div>
+
+    <div>
+      <h2>Step 3: Join this call</h2>
+      <input id="callInput">
+      <button id="answerButton">Answer</button>
+    </div>
+
+    <div>
+      <h2>Step 4: Hangup</h2>
+      <button id="hangupButton" disabled>Hangup</button>
+    </div>
+
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
