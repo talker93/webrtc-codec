@@ -2,7 +2,7 @@ import './style.css'
 
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, getDocs } from "firebase/firestore";
+import { getFirestore, collection, addDoc, getDocs, Firestore, doc, setDoc, Timestamp, updateDoc, serverTimestamp, getDoc, where, query, onSnapshot } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB7Jkv647eebeqifG6mAHv40fUyfdDRB8k",
@@ -159,6 +159,86 @@ isMueteMe.addEventListener("change", function() {
 
 
 // create an offer
+
+// write
+const db = getFirestore();
+// const docRef = doc(collection(db, "objects"));
+// await setDoc(docRef, {nothing: "acutally nothing."});
+// const updateTimestamp = await updateDoc(docRef, {
+//   Timestamp: serverTimestamp()
+// });
+
+const callDoc = doc(collection(db, "calls1"));
+const offerCandidates = callDoc.collection(db, "offerCandidates");
+const answerCandidates = callDoc.collection(db, "answerCandidates");
+await setDoc(callDoc, {
+  answer: {
+    sdp: "v=0o=- 1996785498149694969 2 IN IP4 127.0.0.1s=-t=0 0a=group:BUNDLE 0a=extmap-allow-mixeda=msid-semantic: WMS tPmtU2cGFqwfGn8NqAQ5KmK0iZJ3yk7ZbaXem=audio 9 UDP/TLS/RTP/SAVPF 111 103 104 9 0 8 106 105 13 110 112 113 126c=IN IP4 0.0.0.0a=rtcp:9 IN IP4 0.0.0.0a=ice-ufrag:yOBka=ice-pwd:uDHV+22Wxz/njg9gPkYZdRgGa=ice-options:tricklea=fingerprint:sha-256 AD:E2:1D:C0:4C:9F:AF:57:71:67:86:EE:E1:22:7F:58:D4:D5:34:60:D5:EF:08:FE:7B:88:AD:FA:E6:2D:02:E8a=setup:activea=mid:0a=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-levela=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-timea=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01a=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mida=extmap:5 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-ida=extmap:6 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-ida=sendrecva=msid:tPmtU2cGFqwfGn8NqAQ5KmK0iZJ3yk7ZbaXe 01caea68-be7b-474a-bf58-3dde3009c49ba=rtcp-muxa=rtpmap:111 opus/48000/2a=rtcp-fb:111 transport-cca=fmtp:111 minptime=10;useinbandfec=1a=rtpmap:103 ISAC/16000a=rtpmap:104 ISAC/32000a=rtpmap:9 G722/8000a=rtpmap:0 PCMU/8000a=rtpmap:8 PCMA/8000a=rtpmap:106 CN/32000a=rtpmap:105 CN/16000a=rtpmap:13 CN/8000a=rtpmap:110 telephone-event/48000a=rtpmap:112 telephone-event/32000a=rtpmap:113 telephone-event/16000a=rtpmap:126 telephone-event/8000a=ssrc:3728018646 cname:gfXrZdVTmS1XNrvD",
+    type: "answer"
+  },
+  offer: {
+    sdp: "v=0o=- 6175464053237841724 2 IN IP4 127.0.0.1s=-t=0 0a=group:BUNDLE 0a=extmap-allow-mixeda=msid-semantic: WMS YwOxP4bEuEZjJlkmNwpeDoGIUZBF0yg3h57sm=audio 9 UDP/TLS/RTP/SAVPF 111 103 104 9 0 8 106 105 13 110 112 113 126c=IN IP4 0.0.0.0a=rtcp:9 IN IP4 0.0.0.0a=ice-ufrag:0VvSa=ice-pwd:nq+6bYoV6+DWBFjtuI65eAnma=ice-options:tricklea=fingerprint:sha-256 EB:97:A9:EC:1D:BF:D9:A9:36:5F:9B:E6:11:3F:1F:75:A4:F6:37:BB:6F:E6:E5:B7:96:68:C9:AC:C6:86:D6:A4a=setup:actpassa=mid:0a=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-levela=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-timea=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01a=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mida=extmap:5 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-ida=extmap:6 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-ida=sendrecva=msid:YwOxP4bEuEZjJlkmNwpeDoGIUZBF0yg3h57s dfe42563-3a15-456c-a694-2d4b27d3780ea=rtcp-muxa=rtpmap:111 opus/48000/2a=rtcp-fb:111 transport-cca=fmtp:111 minptime=10;useinbandfec=1a=rtpmap:103 ISAC/16000a=rtpmap:104 ISAC/32000a=rtpmap:9 G722/8000a=rtpmap:0 PCMU/8000a=rtpmap:8 PCMA/8000a=rtpmap:106 CN/32000a=rtpmap:105 CN/16000a=rtpmap:13 CN/8000a=rtpmap:110 telephone-event/48000a=rtpmap:112 telephone-event/32000a=rtpmap:113 telephone-event/16000a=rtpmap:126 telephone-event/8000a=ssrc:134472989 cname:lWe/6jT1dJU+7NfLa=ssrc:134472989 msid:YwOxP4bEuEZjJlkmNwpeDoGIUZBF0yg3h57s dfe42563-3a15-456c-a694-2d4b27d3780ea=ssrc:134472989 mslabel:YwOxP4bEuEZjJlkmNwpeDoGIUZBF0yg3h57sa=ssrc:134472989 label:dfe42563-3a15-456c-a694-2d4b27d3780e",
+    type: "offer"
+  }
+});
+
+
+// read
+const citiesRef = collection(db, "cities");
+
+await setDoc(doc(citiesRef, "SF"), {
+    name: "San Francisco", state: "CA", country: "USA",
+    capital: false, population: 860000,
+    regions: ["west_coast", "norcal"] });
+await setDoc(doc(citiesRef, "LA"), {
+    name: "Los Angeles", state: "CA", country: "USA",
+    capital: false, population: 3900000,
+    regions: ["west_coast", "socal"] });
+await setDoc(doc(citiesRef, "DC"), {
+    name: "Washington, D.C.", state: null, country: "USA",
+    capital: true, population: 680000,
+    regions: ["east_coast"] });
+await setDoc(doc(citiesRef, "TOK"), {
+    name: "Tokyo", state: null, country: "Japan",
+    capital: true, population: 9000000,
+    regions: ["kanto", "honshu"] });
+await setDoc(doc(citiesRef, "BJ"), {
+    name: "Beijing", state: null, country: "China",
+    capital: true, population: 21500000,
+    regions: ["jingjinji", "hebei"] });
+
+// query 1
+// const docRef = doc(db, "cities", "SF");
+// const docSnap = await getDoc(docRef);
+
+// if (docSnap.exists()) {
+//   console.log("Document data: ", docSnap.data());
+// } else {
+//   console.log("No such document!");
+// }
+
+// query 2, remove 'where' to get all documents
+// const q = query(collection(db, "cities"), where("capital", "==", true));
+// const querySnapshot = await getDocs(q);
+// querySnapshot.forEach((doc) => {
+//   console.log(doc.id, " => ", doc.data());
+// });
+
+// query 3, listen to the change
+// const unsub = onSnapshot(doc(db, "cities", "SF"), (doc) => {
+//   console.log("Current data: ", doc.data());
+// });
+
+// query 4, listen to the change of whole document
+const q = query(collection(db, "cities"), where("state", "==", "CA"));
+const unsubscribe = onSnapshot(q, (querySnapshot) => {
+  const cities = [];
+  querySnapshot.forEach((doc) => {
+    cities.push(doc.data().name);
+  });
+  console.log("Current cities in CA: ", cities.join(", "));
+});
+
 
 
 // answer the call
