@@ -10,8 +10,8 @@
     <!-- <div id="app"></div> -->
     
     <div>
-      <h1>Step 1: start your webcam</h1>
-      <h2>Local Stream Setting</h2>
+      <h2>Step 1: start your webcam</h2>
+      <h3>Local Stream Setting</h3>
       <div class="select">
         <input type="checkbox" id="muteMonitor" value="yes" checked="true">
         <label>Mute Monitoring Signal</label>
@@ -25,16 +25,18 @@
         <select id="audioSource"></select>
       </div>
       <div>
-        <div class="label">Local Audio player</div>
+        <!-- <div class="label">Local Audio player</div> -->
+        <br>
         <audio id="webcamVideo" autuplay controls></audio>
       </div>
-      <h2>Remote Stream Setting</h2>
+      <h3>Remote Stream Setting</h3>
       <div class="select">
         <label>Audio output destination: </label>
         <select id="audioOutput"></select>
       </div>
       <div>
-        <div class="label">Remote Audio Player</div>
+        <!-- <div class="label">Remote Audio Player</div> -->
+        <br>
         <audio id="remoteVideo" autoplay controls></audio>
       </div>
       <button id="webcamButton">Start Devices</button>
