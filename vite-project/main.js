@@ -41,8 +41,7 @@ const callInput = document.getElementById('callInput');
 const answerButton = document.getElementById('answerButton');
 const remoteVideo = document.getElementById('remoteVideo');
 const hangupButton = document.getElementById('hangupButton');
-
-
+const testButton = document.getElementById('testButton');
 
 
 
@@ -92,7 +91,16 @@ function changeAudioDestination() {
 function mediaConstructor() {
   const audioSource = audioInputSelect.value;
   const constraints = {
-    audio: {deviceId: audioSource ? {exact: audioSource} : undefined},
+    audio: {
+      deviceId: audioSource,
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+      latency: 0,
+      sampleRate: 48000,
+      sampleSize: 16,
+      volume: 1.0
+    },
     video: false
   };
   return(constraints)
@@ -178,6 +186,7 @@ callButton.onclick = async () => {
   };
 
   const offerDescription = await pc.createOffer();
+  offerDescription.sdp = offerDescription.sdp.replace('useinbandfec=1', 'useinbandfec=1; stereo=1; maxaveragebitrate=510000');
   await pc.setLocalDescription(offerDescription);
   console.log("offerdescription from pa", offerDescription);
 
@@ -239,6 +248,7 @@ answerButton.onclick = async () => {
   await pc.setRemoteDescription(new RTCSessionDescription(offerDescription));
 
   const answerDescription = await pc.createAnswer();
+  answerDescription.sdp = answerDescription.sdp.replace('useinbandfec=1', 'useinbandfec=1; stereo=1; maxaveragebitrate=510000');
   await pc.setLocalDescription(answerDescription);
   console.log("answerDescription from pb", answerDescription);
 
@@ -259,12 +269,55 @@ answerButton.onclick = async () => {
       }
     });
   });
+
 };
 
 
 
+// Step 6. Codec changes
+testButton.onclick = async () => {
+  console.log('button has been pushed');
 
+  let codecList = null;
+  if (pc.iceGatheringState === "complete") {
+    const senders = pc.getSenders();
 
+    senders.forEach((sender) => {
+      if (sender.track.kind === "audio") {
+        codecList = sender.getParameters().codecs;
+        console.log(codecList);
+        return;
+      }
+    });
+  }
+  codecList = null;
+
+  const transceivers = pc.getTransceivers();
+  transceivers.forEach(transceiver => {
+    const kind = transceiver.sender.track.kind;
+    let sendCodecs = RTCRtpSender.getCapabilities(kind).codecs;
+    if (kind === "audio") {
+      sendCodecs = preferCodec(sendCodecs, "audio/PCMA");
+      transceiver.setCodecPreferences(sendCodecs);
+      console.log(sendCodecs);
+    }
+  });
+
+};
+
+function preferCodec(codecs, mimeType) {
+  let otherCodecs = [];
+  let sortedCodecs = [];
+  let count = codecs.length;
+  codecs.forEach(codec => {
+    if (codec.mimeType === mimeType) {
+      sortedCodecs.push(codec);
+    } else {
+      otherCodecs.push(codec);
+    }
+  });
+  return sortedCodecs.concat(otherCodecs);
+}
 
 
 
