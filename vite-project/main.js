@@ -142,6 +142,14 @@ webcamButton.onclick = async () => {
 
 // mute the local monitor signal
 const isMuteMonitor = document.getElementById('muteMonitor');
+
+if(isMuteMonitor.checked == true) {
+  webcamVideo.autoplay = true;
+  webcamVideo.muted = true;
+} else {
+  webcamVideo.muted = false;
+}
+
 isMuteMonitor.addEventListener("change", function() {
   if(isMuteMonitor.checked == true) {
     webcamVideo.autoplay = true;
@@ -166,7 +174,6 @@ isMueteMe.addEventListener("change", function() {
     console.log("unmuted me");
   }
 });
-
 
 
 
