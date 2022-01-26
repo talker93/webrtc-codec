@@ -123,17 +123,24 @@ webcamButton.onclick = async () => {
 
   // push tracks from local stream to peer connections
   localStream.getTracks().forEach((track) => {
+    console.log('case1');
     pc.addTrack(track, localStream);
   });
 
   pc.ontrack = (event) => {
+    console.log('case2');
     event.streams[0].getTracks().forEach((track) => {
+      console.log(track);
       remoteStream.addTrack(track);
     });
   };
 
   webcamVideo.srcObject = localStream;
   remoteVideo.srcObject = remoteStream;
+  // console.log(localStream);
+  // console.log(remoteStream);
+  // console.log(localStream.getTracks());
+  // console.log(remoteStream.getTracks());
 
   callButton.disabled = false;
   answerButton.disabled = false;
@@ -144,7 +151,6 @@ webcamButton.onclick = async () => {
 const isMuteMonitor = document.getElementById('muteMonitor');
 
 if(isMuteMonitor.checked == true) {
-  webcamVideo.autoplay = true;
   webcamVideo.muted = true;
 } else {
   webcamVideo.muted = false;
@@ -152,7 +158,6 @@ if(isMuteMonitor.checked == true) {
 
 isMuteMonitor.addEventListener("change", function() {
   if(isMuteMonitor.checked == true) {
-    webcamVideo.autoplay = true;
     webcamVideo.muted = true;
     console.log("monitor muted");
   } else {
@@ -163,10 +168,10 @@ isMuteMonitor.addEventListener("change", function() {
 
 // mute local input
 // function works only when devices started
-const isMueteMe = document.getElementById('muteMe');
-isMueteMe.checked = false;
-isMueteMe.addEventListener("change", function() {
-  if(isMueteMe.checked == true) {
+const isMuteMe = document.getElementById('muteMe');
+isMuteMe.checked = false;
+isMuteMe.addEventListener("change", function() {
+  if(isMuteMe.checked == true) {
     localStream.getTracks()[0].enabled = false;
     console.log("muted me");
   } else {
@@ -285,30 +290,34 @@ answerButton.onclick = async () => {
 testButton.onclick = async () => {
   console.log('button has been pushed');
 
-  let codecList = null;
-  if (pc.iceGatheringState === "complete") {
-    const senders = pc.getSenders();
+  console.log(webcamVideo.srcObject);
+  console.log(localStream.getTracks());
+  console.log(remoteStream.getTracks());
 
-    senders.forEach((sender) => {
-      if (sender.track.kind === "audio") {
-        codecList = sender.getParameters().codecs;
-        console.log(codecList);
-        return;
-      }
-    });
-  }
-  codecList = null;
+  // let codecList = null;
+  // if (pc.iceGatheringState === "complete") {
+  //   const senders = pc.getSenders();
 
-  const transceivers = pc.getTransceivers();
-  transceivers.forEach(transceiver => {
-    const kind = transceiver.sender.track.kind;
-    let sendCodecs = RTCRtpSender.getCapabilities(kind).codecs;
-    if (kind === "audio") {
-      sendCodecs = preferCodec(sendCodecs, "audio/PCMA");
-      transceiver.setCodecPreferences(sendCodecs);
-      console.log(sendCodecs);
-    }
-  });
+  //   senders.forEach((sender) => {
+  //     if (sender.track.kind === "audio") {
+  //       codecList = sender.getParameters().codecs;
+  //       console.log(codecList);
+  //       return;
+  //     }
+  //   });
+  // }
+  // codecList = null;
+
+  // const transceivers = pc.getTransceivers();
+  // transceivers.forEach(transceiver => {
+  //   const kind = transceiver.sender.track.kind;
+  //   let sendCodecs = RTCRtpSender.getCapabilities(kind).codecs;
+  //   if (kind === "audio") {
+  //     sendCodecs = preferCodec(sendCodecs, "audio/PCMA");
+  //     transceiver.setCodecPreferences(sendCodecs);
+  //     console.log(sendCodecs);
+  //   }
+  // });
 
 };
 
