@@ -137,10 +137,6 @@ webcamButton.onclick = async () => {
 
   webcamVideo.srcObject = localStream;
   remoteVideo.srcObject = remoteStream;
-  // console.log(localStream);
-  // console.log(remoteStream);
-  // console.log(localStream.getTracks());
-  // console.log(remoteStream.getTracks());
 
   callButton.disabled = false;
   answerButton.disabled = false;
@@ -290,9 +286,9 @@ answerButton.onclick = async () => {
 testButton.onclick = async () => {
   console.log('button has been pushed');
 
-  console.log(webcamVideo.srcObject);
-  console.log(localStream.getTracks());
-  console.log(remoteStream.getTracks());
+  // console.log(webcamVideo.srcObject);
+  // console.log(localStream.getTracks());
+  // console.log(remoteStream.getTracks());
 
   // let codecList = null;
   // if (pc.iceGatheringState === "complete") {
@@ -301,7 +297,7 @@ testButton.onclick = async () => {
   //   senders.forEach((sender) => {
   //     if (sender.track.kind === "audio") {
   //       codecList = sender.getParameters().codecs;
-  //       console.log(codecList);
+  //       console.log(codecList);``
   //       return;
   //     }
   //   });
