@@ -42,6 +42,166 @@ const answerButton = document.getElementById('answerButton');
 const remoteVideo = document.getElementById('remoteVideo');
 const hangupButton = document.getElementById('hangupButton');
 const testButton = document.getElementById('testButton');
+const callMessage = document.getElementById('callMessage');
+
+// UI Layer for FX Components
+Nexus.colors.accent = "#2596be";
+Nexus.colors.fill = "#333";
+var muteMonitorToggle = new Nexus.Toggle('#muteMo',{'state':true});
+muteMonitorToggle.on('change', function(v) {
+  document.getElementById('muteMonitor').click();
+})
+var muteSelfToggle = new Nexus.Toggle('#muteMy');
+muteSelfToggle.on('change', function(v) {
+  document.getElementById('muteMe').click();
+});
+var audioSourceSelect = new Nexus.Select('audioSourceSelect',{
+  'size': [200, 20],
+  'options': ['Default - MacBook Pro Microphone', 'iPhone']
+});
+audioSourceSelect.colorize("fill", "#eee");
+var audioOutSelect = new Nexus.Select('audioOutputSelect',{
+  'size': [200, 20],
+  'options': ['Defalut - MacBook Pro Speakers (Built-in)']
+})
+audioOutSelect.colorize("fill", "#eee");
+var startDevices = new Nexus.TextButton('#startDevices',{
+  'size': [150, 50],
+  'state': false,
+  'text': 'Init',
+  'alternateText': 'Activated'
+});
+startDevices.colorize("fill", "#eee");
+startDevices.on('change', function(v) {
+  webcamButton.click();
+});
+// var compressor = new Nexus.Envelope('#compressor');
+var comp_threshold = new Nexus.Dial('#comp_threshold', {
+  'size': [50, 50],
+  'interaction': 'radial',
+  'mode': 'relative',
+  'min': -100,
+  'max': 0,
+  'step': 1,
+  'value': -24
+});
+var comp_knee = new Nexus.Dial('#comp_knee', {
+  'size': [50, 50],
+  'interaction': 'radial',
+  'mode': 'relative',
+  'min': 0,
+  'max': 40,
+  'step': 1,
+  'value': 30
+});
+var comp_ratio = new Nexus.Dial('#comp_ratio', {
+  'size': [50, 50],
+  'interaction': 'radial',
+  'mode': 'relative',
+  'min': 1,
+  'max': 20,
+  'step': 1,
+  'value': 12
+});
+var comp_reduction = new Nexus.Dial('#comp_reduction', {
+  'size': [50, 50],
+  'interaction': 'radial',
+  'mode': 'relative',
+  'min': -20,
+  'max': 0,
+  'step': 1,
+  'value': 0
+});
+var comp_attack = new Nexus.Dial('#comp_attack', {
+  'size': [50, 50],
+  'interaction': 'radial',
+  'mode': 'relative',
+  'min': 0,
+  'max': 1,
+  'step': 0.01,
+  'value': 0.003
+});
+var comp_release = new Nexus.Dial('#comp_release', {
+  'size': [50, 50],
+  'interaction': 'radial',
+  'mode': 'relative',
+  'min': 0,
+  'max': 1,
+  'step': 0.05,
+  'value': 0.25
+});
+var comp_bypass = new Nexus.Toggle('#comp_bypass');
+var reverb = new Nexus.Dial('#reverb', {
+  'size': [50, 50],
+  'interaction': 'radial',
+  'mode': 'relative',
+  'min': 0,
+  'max': 20,
+  'step': 1,
+  'value': 10
+});
+var rev_bypass = new Nexus.Toggle('#rev_bypass');
+var eq_bypass = new Nexus.Toggle('#eq_bypass');
+var eq_type = new Nexus.Select('eq_type', {
+  'size': [200, 20],
+  'options': ['lowshelf', 'highshelf']
+});
+var eq_freq = new Nexus.Slider('eq_freq', {
+  'size': [120, 20],
+  'mode': 'relative',
+  'min': 20,
+  'max': 20000,
+  'step': 100,
+  'value': 1000
+});
+var eq1 = new Nexus.Dial('#eq1', {
+  'size': [50, 50],
+  'interaction': 'radial',
+  'mode': 'relative',
+  'min': -20,
+  'max': 40,
+  'step': 0,
+  'value': 10
+});
+var eq2 = new Nexus.Dial('#eq2', {
+  'size': [50, 50],
+  'interaction': 'radial',
+  'mode': 'relative',
+  'min': -20,
+  'max': 40,
+  'step': 0,
+  'value': 10
+});
+var eq3 = new Nexus.Dial('#eq3', {
+  'size': [50, 50],
+  'interaction': 'radial',
+  'mode': 'relative',
+  'min': -20,
+  'max': 40,
+  'step': 0,
+  'value': 10
+});
+var gain_bypass = new Nexus.Toggle('#gain_bypass');
+var gain = new Nexus.Dial('#gain', {
+  'size': [50, 50],
+  'interaction': 'radial',
+  'mode': 'relative',
+  'min': 0,
+  'max': 20,
+  'step': 1,
+  'value': 2
+});
+var pan_bypass = new Nexus.Toggle('#pan_bypass');
+var pan = new Nexus.Dial('#pan', {
+  'size': [50, 50],
+  'interaction': 'radial',
+  'mode': 'relative',
+  'min': -1,
+  'max': 1,
+  'step': 0.1,
+  'value': 0
+});
+
 
 
 
@@ -123,7 +283,6 @@ webcamButton.onclick = async () => {
 
   // push tracks from local stream to peer connections
   localStream.getTracks().forEach((track) => {
-    console.log('case1');
     pc.addTrack(track, localStream);
   });
 
@@ -135,12 +294,17 @@ webcamButton.onclick = async () => {
     });
   };
 
-  webcamVideo.srcObject = localStream;
+  // webcamVideo.srcObject = localStream;
   remoteVideo.srcObject = remoteStream;
+  webcamVideo.play();
+  remoteVideo.play();
 
   callButton.disabled = false;
   answerButton.disabled = false;
   webcamButton.disabled = true;
+
+
+
 }
 
 // mute the local monitor signal
@@ -183,6 +347,10 @@ isMuteMe.addEventListener("change", function() {
 const db = getFirestore();
 
 callButton.onclick = async () => {
+  let callMsg = document.createTextNode("You created a call.");
+  callMessage.appendChild(callMsg);
+  callButton.disabled = true;
+  answerButton.disabled = true;
   const callDoc = collection(db, 'calls1');
   const callRef = await addDoc(callDoc, {});
   callInput.value = callRef.id;
@@ -240,6 +408,10 @@ callButton.onclick = async () => {
 
 // Step 5. Answer the call with the unique ID
 answerButton.onclick = async () => {
+  let callMsg = document.createTextNode("You answered a call!");
+  callMessage.appendChild(callMsg);
+  callButton.disabled = true;
+  answerButton.disabled = true;
   const callId = callInput.value;
   const callDoc = collection(db, "calls1");
   const answerCandidates = collection(db, 'calls1', callId, 'answerCandidates');
@@ -285,6 +457,150 @@ answerButton.onclick = async () => {
 // Step 6. Codec changes
 testButton.onclick = async () => {
   console.log('button has been pushed');
+
+  // Step 7. Apply FX
+  var audioCtx = new AudioContext();
+  var source = audioCtx.createMediaStreamSource(localStream);
+
+  var biquadFilter = audioCtx.createBiquadFilter();
+  biquadFilter.type = eq_type.value;
+  biquadFilter.frequency.value = eq_freq.value;
+  biquadFilter.gain.value = gain.value;
+
+  var Panner = audioCtx.createStereoPanner();
+  Panner.pan.value = pan.value;
+
+  var Gainner = audioCtx.createGain();
+  Gainner.gain.value = gain.value;
+
+  var Compressor = audioCtx.createDynamicsCompressor();
+  Compressor.release.value = comp_release.value;
+
+  source.connect(Compressor);
+  Compressor.connect(biquadFilter);
+  biquadFilter.connect(Gainner);
+  Gainner.connect(Panner);
+  Panner.connect(audioCtx.destination);
+
+
+  // param function
+  comp_threshold.on('change', function(v) {
+    Compressor.release.value = comp_release.value;
+    console.log(comp_release);
+  });
+
+  comp_attack.on('change', function(v) {
+    Compressor.attack.value = comp_attack.value;
+  });
+
+  comp_knee.on('change', function(v) {
+    Compressor.knee.value = comp_knee.value;
+  });
+
+  comp_ratio.on('change', function(v) {
+    Compressor.ratio.value = comp_ratio.value;
+  });
+
+
+  eq_type.on('change', function(v) {
+    biquadFilter.type = eq_type.value;
+    console.log(eq_type.value);
+  });
+
+  eq_freq.on('change', function(v) {
+    biquadFilter.frequency.value = eq_freq.value;
+    console.log(eq_freq);
+  });
+
+  eq1.on('change', function(v) {
+    biquadFilter.gain.value = eq1.value;
+    console.log(eq1.value);
+  });
+
+  pan.on('change', function(v) {
+    Panner.pan.value = pan.value;
+    console.log(pan.value);
+  });
+
+  gain.on('change', function(v) {
+    Gainner.gain.value = gain.value;
+    console.log(gain.value);
+  });
+
+
+  // Bypass function
+  comp_bypass.on('change', function(v) {
+    if(comp_bypass.state == true) {
+      Compressor.disconnect();
+      source.connect(biquadFilter);
+      biquadFilter.connect(Gainner);
+      Gainner.connect(Panner);
+      Panner.connect(audioCtx.destination);
+    } else {
+      source.connect(Compressor);
+      Compressor.connect(biquadFilter);
+      biquadFilter.connect(Gainner);
+      Gainner.connect(Panner);
+      Panner.connect(audioCtx.destination);
+    }
+  });
+
+  eq_bypass.on('change', function(v) {
+    if(eq_bypass.state == true) {
+      biquadFilter.disconnect();
+      source.connect(Compressor);
+      Compressor.connect(Gainner);
+      Gainner.connect(Panner);
+      Panner.connect(audioCtx.destination);
+    } else {
+      source.connect(Compressor);
+      Compressor.connect(biquadFilter);
+      biquadFilter.connect(Gainner);
+      Gainner.connect(Panner);
+      Panner.connect(audioCtx.destination);
+    }
+  });
+
+  gain_bypass.on('change', function(v) {
+    if(gain_bypass.state == true) {
+      Gainner.disconnect();
+      source.connect(Compressor);
+      Compressor.connect(biquadFilter);
+      biquadFilter.connect(Panner);
+      Panner.connect(audioCtx.destination);
+    } else {
+      source.connect(Compressor);
+      Compressor.connect(biquadFilter);
+      biquadFilter.connect(Gainner);
+      Gainner.connect(Panner);
+      Panner.connect(audioCtx.destination);
+    }
+  });
+
+  pan_bypass.on('change', function(v) {
+    if(pan_bypass.state == true) {
+      Panner.disconnect();
+      source.connect(Compressor);
+      Compressor.connect(biquadFilter);
+      biquadFilter.connect(Gainner);
+      Gainner.connect(audioCtx.destination);
+    } else {
+      source.connect(Compressor);
+      Compressor.connect(biquadFilter);
+      biquadFilter.connect(Gainner);
+      Gainner.connect(Panner);
+      Panner.connect(audioCtx.destination);
+    }
+  });
+
+
+  var oscilloscope = new Nexus.Oscilloscope('#oScope');
+  oscilloscope.connect(source);
+
+  var spectrogram = new Nexus.Spectrogram('#spec');
+  spectrogram.connect(source);
+
+
 
   // console.log(webcamVideo.srcObject);
   // console.log(localStream.getTracks());
