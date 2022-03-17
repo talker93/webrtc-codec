@@ -4,16 +4,24 @@ import './style.css'
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, getDocs, Firestore, doc, setDoc, Timestamp, updateDoc, serverTimestamp, getDoc, where, query, onSnapshot } from "firebase/firestore";
+// import { enableStartButton, disableSendButton, createConnection, onCreateSessionDescriptionError, sendData, closeDataChannels, gotDescription1, gotDescription2, getOtherPc, getName, onIceCandidate, onAddIceCandidateSuccess, onAddIceCandidateError, receiveChannelCallback, onReceiveMessageCallback, onSendChannelStateChange, onReceiveChannelStateChange } from './module.js';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyB7Jkv647eebeqifG6mAHv40fUyfdDRB8k",
-  authDomain: "fireship-demos-ce28a.firebaseapp.com",
-  databaseURL: "https://fireship-demos-ce28a-default-rtdb.firebaseio.com",
-  projectId: "fireship-demos-ce28a",
-  storageBucket: "fireship-demos-ce28a.appspot.com",
-  messagingSenderId: "710932691797",
-  appId: "1:710932691797:web:5838b9fd459ba264af4ddc",
-  measurementId: "G-FNWH5RC87G"
+  // apiKey: "AIzaSyB7Jkv647eebeqifG6mAHv40fUyfdDRB8k",
+  // authDomain: "fireship-demos-ce28a.firebaseapp.com",
+  // databaseURL: "https://fireship-demos-ce28a-default-rtdb.firebaseio.com",
+  // projectId: "fireship-demos-ce28a",
+  // storageBucket: "fireship-demos-ce28a.appspot.com",
+  // messagingSenderId: "710932691797",
+  // appId: "1:710932691797:web:5838b9fd459ba264af4ddc",
+  // measurementId: "G-FNWH5RC87G"
+  apiKey: "AIzaSyBLAS9TSpc8v-273koNVal1Tt1jes7lAQQ",
+  authDomain: "webcodec-64053.firebaseapp.com",
+  projectId: "webcodec-64053",
+  storageBucket: "webcodec-64053.appspot.com",
+  messagingSenderId: "499852745372",
+  appId: "1:499852745372:web:c5d05223a82e7e26c86b59",
+  measurementId: "G-TY670YZV22"
 };
 
 // Initialize Firebase
@@ -31,7 +39,17 @@ const servers = {
 const pc = new RTCPeerConnection(servers);
 let localStream = null;
 let remoteStream = null;
-let sender = null;
+let sender = null;let sendChannel;
+// let receiveChannel;
+// const dataChannelSend = document.querySelector('textarea#dataChannelSend');
+// const dataChannelReceived = document.querySelector('textarea#dataChannelReceive');
+// const startButton = document.querySelector('button#startButton');
+// const sendButton = document.querySelector('button#sendButton');
+// const closeButton = document.querySelector('button#closeButton');
+
+// startButton.onclick = createConnection;
+// sendButton.onclick = sendData;
+// closeButton.onclick = closeDataChannels;
 
 // HTML elements
 const webcamButton = document.getElementById('webcamButton');
@@ -450,6 +468,45 @@ answerButton.onclick = async () => {
     });
   });
 
+  const q_comp = query(doc(db, 'fxValues', 'comp'));
+  onSnapshot(q_comp, (snapshot) => {
+    const data = snapshot.data();
+    if(typeof data.comp_threshold != "undefined") {comp_threshold.value = data.comp_threshold;}
+    if(typeof data.comp_release != "undefined") {comp_release.value = data.comp_release;}
+    if(typeof data.comp_attack != "undefined") {comp_attack.value = data.comp_attack;}
+    if(typeof data.comp_knee != "undefined") {comp_knee.value = data.comp_knee;}
+    if(typeof data.comp_ratio != "undefined") {comp_ratio.value = data.comp_ratio;}
+    if(typeof data.comp_reduction != "undefined") {comp_reduction.value = data.comp_reduction;}
+    if(typeof data.comp_bypass != "undefined") {
+      comp_bypass.state = data.comp_bypass;
+    }
+    console.log(data.comp_threshold);
+  });
+
+  const q_eq = query(doc(db, 'fxValues', 'eq'));
+  onSnapshot(q_eq, (snapshot) => {
+    const data = snapshot.data();
+    if(typeof data.eq_type != "undefined") {eq_type.value = data.eq_type;}
+    if(typeof data.eq_freq != "undefined") {eq_freq.value = data.eq_freq;}
+    if(typeof data.eq1 != "undefined") {eq1.value = data.eq1;}
+    if(typeof data.eq_bypass != "undefined") {
+      eq_bypass.state = data.eq_bypass;
+    }
+  });
+
+  const q_other = query(doc(db, 'fxValues', 'other'));
+  onSnapshot(q_other, (snapshot) => {
+    const data = snapshot.data();
+    if(typeof data.pan != "undefined") {pan.value = data.pan;}
+    if(typeof data.gain != "undefined") {gain.value = data.gain;}
+    if(typeof data.gain_bypass != "undefined") {
+      gain_bypass.state = data.gain_bypass;
+    }
+    if(typeof data.pan_bypass != "undefined") {
+      pan_bypass.state = data.pan_bypass;
+    }
+  });
+
 };
 
 
@@ -459,6 +516,7 @@ testButton.onclick = async () => {
   console.log('button has been pushed');
 
   // Step 7. Apply FX
+  // Init FXs
   var audioCtx = new AudioContext();
   var source = audioCtx.createMediaStreamSource(localStream);
 
@@ -483,53 +541,70 @@ testButton.onclick = async () => {
   Panner.connect(audioCtx.destination);
 
 
-  // param function
+  // param listener
+  const compValue = doc(db, 'fxValues', 'comp');
+  const eqValue = doc(db, 'fxValues', 'eq');
+  const otherValue = doc(db, 'fxValues', 'other');
+
   comp_threshold.on('change', function(v) {
+    Compressor.threshold.value = comp_threshold.value;
+    updateDoc(compValue, { 'comp_threshold': comp_threshold.value });
+  });
+
+  comp_release.on('change', function(v) {
     Compressor.release.value = comp_release.value;
-    console.log(comp_release);
+    updateDoc(compValue, { 'comp_release': comp_release.value });
   });
 
   comp_attack.on('change', function(v) {
     Compressor.attack.value = comp_attack.value;
+    updateDoc(compValue, { 'comp_attack': comp_attack.value });
   });
 
   comp_knee.on('change', function(v) {
     Compressor.knee.value = comp_knee.value;
+    updateDoc(compValue, {'comp_knee': comp_knee.value });
   });
 
   comp_ratio.on('change', function(v) {
     Compressor.ratio.value = comp_ratio.value;
+    updateDoc(compValue, { 'comp_ratio': comp_ratio.value });
+  });
+
+  comp_reduction.on('change', function(v) {
+    updateDoc(compValue, { 'comp_reduction' : comp_reduction.value });
   });
 
 
   eq_type.on('change', function(v) {
     biquadFilter.type = eq_type.value;
-    console.log(eq_type.value);
+    updateDoc(eqValue, { 'eq_type': eq_type.value });
   });
 
   eq_freq.on('change', function(v) {
     biquadFilter.frequency.value = eq_freq.value;
-    console.log(eq_freq);
+    updateDoc(eqValue, { 'eq_freq': eq_freq.value });
   });
 
   eq1.on('change', function(v) {
     biquadFilter.gain.value = eq1.value;
-    console.log(eq1.value);
+    updateDoc(eqValue, { 'eq1': eq1.value });
   });
 
   pan.on('change', function(v) {
     Panner.pan.value = pan.value;
-    console.log(pan.value);
+    updateDoc(otherValue, { 'pan': pan.value });
   });
 
   gain.on('change', function(v) {
     Gainner.gain.value = gain.value;
-    console.log(gain.value);
+    updateDoc(otherValue, { 'gain': gain.value });
   });
 
 
   // Bypass function
   comp_bypass.on('change', function(v) {
+    updateDoc(compValue, { 'comp_bypass' : comp_bypass.state });
     if(comp_bypass.state == true) {
       Compressor.disconnect();
       source.connect(biquadFilter);
@@ -546,6 +621,7 @@ testButton.onclick = async () => {
   });
 
   eq_bypass.on('change', function(v) {
+    updateDoc(eqValue, { 'eq_bypass' : eq_bypass.state });
     if(eq_bypass.state == true) {
       biquadFilter.disconnect();
       source.connect(Compressor);
@@ -562,6 +638,7 @@ testButton.onclick = async () => {
   });
 
   gain_bypass.on('change', function(v) {
+    updateDoc(otherValue, { 'gain_bypass' : gain_bypass.state });
     if(gain_bypass.state == true) {
       Gainner.disconnect();
       source.connect(Compressor);
@@ -578,6 +655,7 @@ testButton.onclick = async () => {
   });
 
   pan_bypass.on('change', function(v) {
+    updateDoc(otherValue, { 'pan_bypass' : pan_bypass.state });
     if(pan_bypass.state == true) {
       Panner.disconnect();
       source.connect(Compressor);
@@ -707,3 +785,78 @@ function preferCodec(codecs, mimeType) {
 //   });
 //   console.log("Current cities in CA: ", cities.join(", "));
 // });
+
+// function createConnection() {
+//   dataChannelSend.placeholder = '';
+//   console.log('Created local peer connection object localConnection');
+
+//   sendChannel = pc.createDataChannel('sendDataChannel');
+//   console.log('Created send data channel');
+//   console.log(sendChannel);
+
+//   sendChannel.onopen = onSendChannelStateChange;
+//   sendChannel.onclose = onSendChannelStateChange;
+
+//   pc.ondatachannel = receiveChannelCallback;
+
+//   startButton.disabled = true;
+//   closeButton.disabled = false;
+// }
+
+// function sendData() {
+//   const data = dataChannelSend.value;
+//   sendChannel.send(data);
+//   console.log('Sent Data: ' + data);
+// }
+
+// function closeDataChannels() {
+//   console.log('Closing data channels');
+//   sendChannel.close();
+//   console.log('Closed data channel with label: ' + sendChannel.label);
+//   receiveChannel.close();
+//   console.log('Closed data channel with label: ' + receiveChannel.label);
+//   pc.close();
+//   pc = null;
+//   console.log('Closed peer connections');
+//   startButton.disabled = false;
+//   sendButton.disabled = true;
+//   closeButton.disabled = true;
+//   dataChannelSend.value = '';
+//   dataChannelReceive.value = '';
+//   dataChannelSend.disabled = true;
+//   disableSendButton();
+//   enableStartButton();
+// }
+
+// function receiveChannelCallback(event) {
+//   console.log('Receive Channel Callback');
+//   receiveChannel = event.channel;
+//   receiveChannel.onmessage = onReceiveMessageCallback;
+//   receiveChannel.onopen = onReceiveChannelStateChange;
+//   receiveChannel.onclose = onReceiveChannelStateChange;
+// }
+
+// function onReceiveMessageCallback(event) {
+//   console.log('Received Message');
+//   dataChannelReceive.value = event.data;
+// }
+
+// function onSendChannelStateChange() {
+//   const readyState = sendChannel.readyState;
+//   console.log('Send channel state is: ' + readyState);
+//   if (readyState === 'open') {
+//     dataChannelSend.disabled = false;
+//     dataChannelSend.focus();
+//     sendButton.disabled = false;
+//     closeButton.disabled = false;
+//   } else {
+//     dataChannelSend.disabled = true;
+//     sendButton.disabled = true;
+//     closeButton.disabled = true;
+//   }
+// }
+
+// function onReceiveChannelStateChange() {
+//   const readyState = receiveChannel.readyState;
+//   console.log(`Receive channel state is: ${readyState}`);
+// }
