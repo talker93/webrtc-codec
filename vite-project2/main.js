@@ -39,17 +39,7 @@ const servers = {
 const pc = new RTCPeerConnection(servers);
 let localStream = null;
 let remoteStream = null;
-let sender = null;let sendChannel;
-// let receiveChannel;
-// const dataChannelSend = document.querySelector('textarea#dataChannelSend');
-// const dataChannelReceived = document.querySelector('textarea#dataChannelReceive');
-// const startButton = document.querySelector('button#startButton');
-// const sendButton = document.querySelector('button#sendButton');
-// const closeButton = document.querySelector('button#closeButton');
-
-// startButton.onclick = createConnection;
-// sendButton.onclick = sendData;
-// closeButton.onclick = closeDataChannels;
+let sender = null;
 
 // HTML elements
 const webcamButton = document.getElementById('webcamButton');
@@ -61,6 +51,17 @@ const remoteVideo = document.getElementById('remoteVideo');
 const hangupButton = document.getElementById('hangupButton');
 const testButton = document.getElementById('testButton');
 const callMessage = document.getElementById('callMessage');
+const sendButton = document.getElementById('sendButton');
+const sendArea = document.getElementById('dataChannelSend');
+const receiveArea = document.getElementById('dataChannelReceive');
+let sendChannel;
+let receiveChannel;
+
+sendButton.onclick = e => {
+  const data = sendArea.value;
+  sendChannel.send(data);
+  console.log("sent data: ");
+}
 
 // UI Layer for FX Components
 Nexus.colors.accent = "#2596be";
@@ -305,9 +306,7 @@ webcamButton.onclick = async () => {
   });
 
   pc.ontrack = (event) => {
-    console.log('case2');
     event.streams[0].getTracks().forEach((track) => {
-      console.log(track);
       remoteStream.addTrack(track);
     });
   };
@@ -363,12 +362,30 @@ isMuteMe.addEventListener("change", function() {
 
 // Step 4. create an offer
 const db = getFirestore();
+pc.onicegatheringstatechange = ev => {
+  console.log("iceGatheringState: ", pc.iceGatheringState);
+}
+pc.oniceconnectionstatechange = ev => {
+  console.log("iceConnectionState: ", pc.iceConnectionState);
+}
+pc.onconnectionstatechange = event => {
+  console.log("connection State: ", pc.connectionState);
+}
 
 callButton.onclick = async () => {
+  
+  sendChannel = pc.createDataChannel("sendDataChannel");
+  sendChannel.onopen = e => {
+    sendArea.disabled = false;
+  }
+  sendChannel.onclose = e => {
+    sendArea.disabled = true;
+  }
+
   let callMsg = document.createTextNode("You created a call.");
   callMessage.appendChild(callMsg);
-  callButton.disabled = true;
-  answerButton.disabled = true;
+  // callButton.disabled = true;
+  // answerButton.disabled = true;
   const callDoc = collection(db, 'calls1');
   const callRef = await addDoc(callDoc, {});
   callInput.value = callRef.id;
@@ -376,21 +393,22 @@ callButton.onclick = async () => {
   const answerCandidates = collection(db, "calls1", callRef.id, "answerCandidates");
 
   pc.onicecandidate = (event) => {
-    event.candidate && addDoc(offerCandidates, event.candidate.toJSON());
+    if(event.candidate) {
+      addDoc(offerCandidates, event.candidate.toJSON());
+    }
+    console.log("PA updated candidates in database");
   };
 
-  const offerDescription = await pc.createOffer();
+  const offerDescription = await pc.createOffer().then(console.log("PA created offer"));
   offerDescription.sdp = offerDescription.sdp.replace('useinbandfec=1', 'useinbandfec=1; stereo=1; maxaveragebitrate=510000');
-  await pc.setLocalDescription(offerDescription);
-  console.log("offerdescription from pa", offerDescription);
+  await pc.setLocalDescription(offerDescription).then(console.log("PA set local desc"));
 
   const offer = {
     sdp: offerDescription.sdp,
     type: offerDescription.type,
   };
 
-  await setDoc(doc(db, 'calls1', callRef.id), {offer});
-  console.log("offer from pa", offer);
+  await setDoc(doc(db, 'calls1', callRef.id), {offer}).then(console.log("PA updated offer in database"));
 
   // Listen for remote answer
   const q1 = query(doc(db, 'calls1', callRef.id));
@@ -399,7 +417,7 @@ callButton.onclick = async () => {
     if (!pc.currentRemoteDescription && data?.answer) {
       const answerDescription = new RTCSessionDescription(data.answer);
       pc.setRemoteDescription(answerDescription);
-      console.log("answerdescription from pa", answerDescription);
+      console.log("PA set remote desc");
     }
   });
 
@@ -410,7 +428,7 @@ callButton.onclick = async () => {
       if (change.type === 'added') {
         const candidate = new RTCIceCandidate(change.doc.data());
         pc.addIceCandidate(candidate);
-        console.log("candidate from pa", candidate);
+        // console.log("a, connection: added candidate in local connection");
       }
     });
   });
@@ -426,6 +444,20 @@ callButton.onclick = async () => {
 
 // Step 5. Answer the call with the unique ID
 answerButton.onclick = async () => {
+
+  pc.ondatachannel = (event) => {
+    receiveChannel = event.channel;
+    receiveChannel.onmessage = e => {
+      receiveArea.value = e.data;
+    }
+    receiveChannel.onopen = e => {
+      receiveArea.disabled = false;
+    }
+    receiveChannel.onclose = e => {
+      receiveArea.disabled = true;
+    }
+  }
+
   let callMsg = document.createTextNode("You answered a call!");
   callMessage.appendChild(callMsg);
   callButton.disabled = true;
@@ -437,18 +469,19 @@ answerButton.onclick = async () => {
 
   pc.onicecandidate = (event) => {
     event.candidate && addDoc(answerCandidates, event.candidate.toJSON());
+    console.log("PB updated candidate in database");
   };
 
   const callData = (await getDoc(doc(callDoc, callId))).data();
-  console.log(callData);
 
   const offerDescription = callData.offer;
   await pc.setRemoteDescription(new RTCSessionDescription(offerDescription));
+  console.log("PB set remote desc");
 
   const answerDescription = await pc.createAnswer();
   answerDescription.sdp = answerDescription.sdp.replace('useinbandfec=1', 'useinbandfec=1; stereo=1; maxaveragebitrate=510000');
   await pc.setLocalDescription(answerDescription);
-  console.log("answerDescription from pb", answerDescription);
+  console.log("PB set local desc");
 
   const answer = {
     type: answerDescription.type,
@@ -456,7 +489,7 @@ answerButton.onclick = async () => {
   };
 
   await updateDoc(doc(db, 'calls1', callId), { answer });
-  console.log("answer from pb", answer);
+  console.log("PB updated answer in database");
 
   const q3 = query(offerCandidates);
   onSnapshot(q3, (snapshot) => {
@@ -464,6 +497,7 @@ answerButton.onclick = async () => {
       if (change.type === 'added') {
         let data = change.doc.data();
         pc.addIceCandidate(new RTCIceCandidate(data));
+        // console.log("b, connection: added candidate on remote connection");
       }
     });
   });
@@ -785,78 +819,3 @@ function preferCodec(codecs, mimeType) {
 //   });
 //   console.log("Current cities in CA: ", cities.join(", "));
 // });
-
-// function createConnection() {
-//   dataChannelSend.placeholder = '';
-//   console.log('Created local peer connection object localConnection');
-
-//   sendChannel = pc.createDataChannel('sendDataChannel');
-//   console.log('Created send data channel');
-//   console.log(sendChannel);
-
-//   sendChannel.onopen = onSendChannelStateChange;
-//   sendChannel.onclose = onSendChannelStateChange;
-
-//   pc.ondatachannel = receiveChannelCallback;
-
-//   startButton.disabled = true;
-//   closeButton.disabled = false;
-// }
-
-// function sendData() {
-//   const data = dataChannelSend.value;
-//   sendChannel.send(data);
-//   console.log('Sent Data: ' + data);
-// }
-
-// function closeDataChannels() {
-//   console.log('Closing data channels');
-//   sendChannel.close();
-//   console.log('Closed data channel with label: ' + sendChannel.label);
-//   receiveChannel.close();
-//   console.log('Closed data channel with label: ' + receiveChannel.label);
-//   pc.close();
-//   pc = null;
-//   console.log('Closed peer connections');
-//   startButton.disabled = false;
-//   sendButton.disabled = true;
-//   closeButton.disabled = true;
-//   dataChannelSend.value = '';
-//   dataChannelReceive.value = '';
-//   dataChannelSend.disabled = true;
-//   disableSendButton();
-//   enableStartButton();
-// }
-
-// function receiveChannelCallback(event) {
-//   console.log('Receive Channel Callback');
-//   receiveChannel = event.channel;
-//   receiveChannel.onmessage = onReceiveMessageCallback;
-//   receiveChannel.onopen = onReceiveChannelStateChange;
-//   receiveChannel.onclose = onReceiveChannelStateChange;
-// }
-
-// function onReceiveMessageCallback(event) {
-//   console.log('Received Message');
-//   dataChannelReceive.value = event.data;
-// }
-
-// function onSendChannelStateChange() {
-//   const readyState = sendChannel.readyState;
-//   console.log('Send channel state is: ' + readyState);
-//   if (readyState === 'open') {
-//     dataChannelSend.disabled = false;
-//     dataChannelSend.focus();
-//     sendButton.disabled = false;
-//     closeButton.disabled = false;
-//   } else {
-//     dataChannelSend.disabled = true;
-//     sendButton.disabled = true;
-//     closeButton.disabled = true;
-//   }
-// }
-
-// function onReceiveChannelStateChange() {
-//   const readyState = receiveChannel.readyState;
-//   console.log(`Receive channel state is: ${readyState}`);
-// }
