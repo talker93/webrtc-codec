@@ -7,14 +7,6 @@ import { getFirestore, collection, addDoc, getDocs, Firestore, doc, setDoc, Time
 // import { enableStartButton, disableSendButton, createConnection, onCreateSessionDescriptionError, sendData, closeDataChannels, gotDescription1, gotDescription2, getOtherPc, getName, onIceCandidate, onAddIceCandidateSuccess, onAddIceCandidateError, receiveChannelCallback, onReceiveMessageCallback, onSendChannelStateChange, onReceiveChannelStateChange } from './module.js';
 
 const firebaseConfig = {
-  // apiKey: "AIzaSyB7Jkv647eebeqifG6mAHv40fUyfdDRB8k",
-  // authDomain: "fireship-demos-ce28a.firebaseapp.com",
-  // databaseURL: "https://fireship-demos-ce28a-default-rtdb.firebaseio.com",
-  // projectId: "fireship-demos-ce28a",
-  // storageBucket: "fireship-demos-ce28a.appspot.com",
-  // messagingSenderId: "710932691797",
-  // appId: "1:710932691797:web:5838b9fd459ba264af4ddc",
-  // measurementId: "G-FNWH5RC87G"
   apiKey: "AIzaSyBLAS9TSpc8v-273koNVal1Tt1jes7lAQQ",
   authDomain: "webcodec-64053.firebaseapp.com",
   projectId: "webcodec-64053",
@@ -49,19 +41,12 @@ const callInput = document.getElementById('callInput');
 const answerButton = document.getElementById('answerButton');
 const remoteVideo = document.getElementById('remoteVideo');
 const hangupButton = document.getElementById('hangupButton');
-const testButton = document.getElementById('testButton');
 const callMessage = document.getElementById('callMessage');
-const sendButton = document.getElementById('sendButton');
-const sendArea = document.getElementById('dataChannelSend');
-const receiveArea = document.getElementById('dataChannelReceive');
 let sendChannel;
 let receiveChannel;
+let receiveHandle = false;
 
-sendButton.onclick = e => {
-  const data = sendArea.value;
-  sendChannel.send(data);
-  console.log("sent data: ");
-}
+
 
 // UI Layer for FX Components
 Nexus.colors.accent = "#2596be";
@@ -121,15 +106,6 @@ var comp_ratio = new Nexus.Dial('#comp_ratio', {
   'max': 20,
   'step': 1,
   'value': 12
-});
-var comp_reduction = new Nexus.Dial('#comp_reduction', {
-  'size': [50, 50],
-  'interaction': 'radial',
-  'mode': 'relative',
-  'min': -20,
-  'max': 0,
-  'step': 1,
-  'value': 0
 });
 var comp_attack = new Nexus.Dial('#comp_attack', {
   'size': [50, 50],
@@ -221,7 +197,34 @@ var pan = new Nexus.Dial('#pan', {
   'value': 0
 });
 
-
+// for datachannel
+var fxValues = {
+  comp: {
+    attack: comp_attack.value,
+    bypass: comp_bypass.state,
+    knee: comp_knee.value,
+    ratio: comp_ratio.value,
+    release: comp_release.value,
+    threshold: comp_threshold.value
+  },
+  eq: {
+    low: eq1.value,
+    mid: eq2.value,
+    high: eq3.value,
+    bypass: eq_bypass.state,
+    freq: eq_freq.value,
+    type: eq_type.value
+  },
+  pan: {
+    bypass: pan_bypass.state,
+    pan: pan.value
+  },
+  gain: {
+    bypass: gain_bypass.state,
+    gain: gain.value 
+  },
+  whatChanged: "none"
+};
 
 
 // Step 2. media query
@@ -319,9 +322,7 @@ webcamButton.onclick = async () => {
   callButton.disabled = false;
   answerButton.disabled = false;
   webcamButton.disabled = true;
-
-
-
+  fxFunctions();
 }
 
 // mute the local monitor signal
@@ -362,30 +363,111 @@ isMuteMe.addEventListener("change", function() {
 
 // Step 4. create an offer
 const db = getFirestore();
-pc.onicegatheringstatechange = ev => {
-  console.log("iceGatheringState: ", pc.iceGatheringState);
-}
-pc.oniceconnectionstatechange = ev => {
-  console.log("iceConnectionState: ", pc.iceConnectionState);
-}
-pc.onconnectionstatechange = event => {
-  console.log("connection State: ", pc.connectionState);
-}
 
 callButton.onclick = async () => {
   
   sendChannel = pc.createDataChannel("sendDataChannel");
   sendChannel.onopen = e => {
-    sendArea.disabled = false;
+    console.log("send channel opened");
   }
   sendChannel.onclose = e => {
-    sendArea.disabled = true;
+    console.log("send channel closed");
   }
+
+  pc.ondatachannel = (event) => {
+    receiveChannel = event.channel;
+    receiveChannel.onmessage = async e => {
+      receiveHandle = true;
+      fxValues = JSON.parse(e.data);
+      switch (fxValues.whatChanged) {
+        case 'comp.threshold':
+          await (comp_threshold.value = fxValues.comp.threshold);
+          receiveHandle = false;
+          break;
+
+        case 'comp.release':
+          await (comp_release.value = fxValues.comp.release);
+          receiveHandle = false;
+          break;
+        
+        case 'comp.attack':
+          await (comp_attack.value = fxValues.comp.attack);
+          break;
+
+        case 'comp.knee':
+          await (comp_knee.value = fxValues.comp.knee);
+          break;
+
+        case 'comp.ratio':
+          await (comp_ratio.value = fxValues.comp.ratio);
+          break;
+
+        case 'comp.reduction':
+          await (comp_recduction.value = fxValues.comp.reduction);
+          break;
+
+        case 'eq.type':
+          await (eq_type.value = fxValues.eq.type);
+          break;
+
+        case 'eq.freq':
+          await (eq_freq.value = fxValues.eq.freq);
+          break;
+
+        case 'eq.low':
+          await (eq1.value = fxValues.eq.low);
+          break;
+
+        case 'eq.mid':
+          await (eq2.value = fxValues.eq.mid);
+          break;
+
+        case 'eq.high':
+          await (eq3.value = fxValues.eq.high);
+          break;
+
+        case 'pan.pan':
+          await (pan.value = fxValues.pan.pan);
+          break;
+        
+        case 'gain.gain':
+          await (gain.value = fxValues.gain.gain);
+          break;
+
+        case 'comp.bypass':
+          await (comp_bypass.state = fxValues.comp.bypass);
+          break;
+
+        case 'eq.bypass':
+          await (eq_bypass.state = fxValues.eq.bypass);
+          break;
+
+        case 'gain.bypass':
+          await (gain_bypass.state = fxValues.gain.bypass);
+          break;
+
+        case 'pan.bypass':
+          await (pan_bypass.state = fxValues.pan.bypass);
+          break;
+      
+        default:
+          console.log("invalid exchanged value");
+          break;
+      }
+    }
+    receiveChannel.onopen = e => {
+      console.log("receive channel opened");
+    }
+    receiveChannel.onclose = e => {
+      console.log("receive channel closed");
+    }
+  }
+
 
   let callMsg = document.createTextNode("You created a call.");
   callMessage.appendChild(callMsg);
-  // callButton.disabled = true;
-  // answerButton.disabled = true;
+  callButton.disabled = true;
+  answerButton.disabled = true;
   const callDoc = collection(db, 'calls1');
   const callRef = await addDoc(callDoc, {});
   callInput.value = callRef.id;
@@ -434,6 +516,8 @@ callButton.onclick = async () => {
   });
 
   hangupButton.disabled = false;
+
+
 };
 
 
@@ -444,17 +528,101 @@ callButton.onclick = async () => {
 
 // Step 5. Answer the call with the unique ID
 answerButton.onclick = async () => {
+  
+  sendChannel = pc.createDataChannel("sendDataChannel2");
+  sendChannel.onopen = e => {
+    console.log("send channel opened");
+  }
+  sendChannel.onclose = e => {
+    console.log("send channel closed");
+  }
 
   pc.ondatachannel = (event) => {
     receiveChannel = event.channel;
-    receiveChannel.onmessage = e => {
-      receiveArea.value = e.data;
+    receiveChannel.onmessage = async e => {
+      receiveHandle = true;
+      fxValues = JSON.parse(e.data);
+      switch (fxValues.whatChanged) {
+        case 'comp.threshold':
+          await (comp_threshold.value = fxValues.comp.threshold);
+          receiveHandle = false;
+          break;
+
+        case 'comp.release':
+          await (comp_release.value = fxValues.comp.release);
+          receiveHandle = false;
+          break;
+        
+        case 'comp.attack':
+          await (comp_attack.value = fxValues.comp.attack);
+          break;
+
+        case 'comp.knee':
+          await (comp_knee.value = fxValues.comp.knee);
+          break;
+
+        case 'comp.ratio':
+          await (comp_ratio.value = fxValues.comp.ratio);
+          break;
+
+        case 'comp.reduction':
+          await (comp_recduction.value = fxValues.comp.reduction);
+          break;
+
+        case 'eq.type':
+          await (eq_type.value = fxValues.eq.type);
+          break;
+
+        case 'eq.freq':
+          await (eq_freq.value = fxValues.eq.freq);
+          break;
+
+        case 'eq.low':
+          await (eq1.value = fxValues.eq.low);
+          break;
+
+        case 'eq.mid':
+          await (eq2.value = fxValues.eq.mid);
+          break;
+
+        case 'eq.high':
+          await (eq3.value = fxValues.eq.high);
+          break;
+
+        case 'pan.pan':
+          await (pan.value = fxValues.pan.pan);
+          break;
+        
+        case 'gain.gain':
+          await (gain.value = fxValues.gain.gain);
+          break;
+
+        case 'comp.bypass':
+          await (comp_bypass.state = fxValues.comp.bypass);
+          break;
+
+        case 'eq.bypass':
+          await (eq_bypass.state = fxValues.eq.bypass);
+          break;
+
+        case 'gain.bypass':
+          await (gain_bypass.state = fxValues.gain.bypass);
+          break;
+
+        case 'pan.bypass':
+          await (pan_bypass.state = fxValues.pan.bypass);
+          break;
+      
+        default:
+          console.log("invalid exchanged value");
+          break;
+      }
     }
     receiveChannel.onopen = e => {
-      receiveArea.disabled = false;
+      console.log("receive channel opened");
     }
     receiveChannel.onclose = e => {
-      receiveArea.disabled = true;
+      console.log("receive channel closed");
     }
   }
 
@@ -497,48 +665,8 @@ answerButton.onclick = async () => {
       if (change.type === 'added') {
         let data = change.doc.data();
         pc.addIceCandidate(new RTCIceCandidate(data));
-        // console.log("b, connection: added candidate on remote connection");
       }
     });
-  });
-
-  const q_comp = query(doc(db, 'fxValues', 'comp'));
-  onSnapshot(q_comp, (snapshot) => {
-    const data = snapshot.data();
-    if(typeof data.comp_threshold != "undefined") {comp_threshold.value = data.comp_threshold;}
-    if(typeof data.comp_release != "undefined") {comp_release.value = data.comp_release;}
-    if(typeof data.comp_attack != "undefined") {comp_attack.value = data.comp_attack;}
-    if(typeof data.comp_knee != "undefined") {comp_knee.value = data.comp_knee;}
-    if(typeof data.comp_ratio != "undefined") {comp_ratio.value = data.comp_ratio;}
-    if(typeof data.comp_reduction != "undefined") {comp_reduction.value = data.comp_reduction;}
-    if(typeof data.comp_bypass != "undefined") {
-      comp_bypass.state = data.comp_bypass;
-    }
-    console.log(data.comp_threshold);
-  });
-
-  const q_eq = query(doc(db, 'fxValues', 'eq'));
-  onSnapshot(q_eq, (snapshot) => {
-    const data = snapshot.data();
-    if(typeof data.eq_type != "undefined") {eq_type.value = data.eq_type;}
-    if(typeof data.eq_freq != "undefined") {eq_freq.value = data.eq_freq;}
-    if(typeof data.eq1 != "undefined") {eq1.value = data.eq1;}
-    if(typeof data.eq_bypass != "undefined") {
-      eq_bypass.state = data.eq_bypass;
-    }
-  });
-
-  const q_other = query(doc(db, 'fxValues', 'other'));
-  onSnapshot(q_other, (snapshot) => {
-    const data = snapshot.data();
-    if(typeof data.pan != "undefined") {pan.value = data.pan;}
-    if(typeof data.gain != "undefined") {gain.value = data.gain;}
-    if(typeof data.gain_bypass != "undefined") {
-      gain_bypass.state = data.gain_bypass;
-    }
-    if(typeof data.pan_bypass != "undefined") {
-      pan_bypass.state = data.pan_bypass;
-    }
   });
 
 };
@@ -546,18 +674,19 @@ answerButton.onclick = async () => {
 
 
 // Step 6. Codec changes
-testButton.onclick = async () => {
+async function fxFunctions () {
   console.log('button has been pushed');
+
 
   // Step 7. Apply FX
   // Init FXs
   var audioCtx = new AudioContext();
   var source = audioCtx.createMediaStreamSource(localStream);
 
-  var biquadFilter = audioCtx.createBiquadFilter();
-  biquadFilter.type = eq_type.value;
-  biquadFilter.frequency.value = eq_freq.value;
-  biquadFilter.gain.value = gain.value;
+  var Filter = audioCtx.createBiquadFilter();
+  Filter.type = eq_type.value;
+  Filter.frequency.value = eq_freq.value;
+  Filter.gain.value = gain.value;
 
   var Panner = audioCtx.createStereoPanner();
   Panner.pan.value = pan.value;
@@ -569,139 +698,202 @@ testButton.onclick = async () => {
   Compressor.release.value = comp_release.value;
 
   source.connect(Compressor);
-  Compressor.connect(biquadFilter);
-  biquadFilter.connect(Gainner);
+  Compressor.connect(Filter);
+  Filter.connect(Gainner);
   Gainner.connect(Panner);
   Panner.connect(audioCtx.destination);
 
 
   // param listener
-  const compValue = doc(db, 'fxValues', 'comp');
-  const eqValue = doc(db, 'fxValues', 'eq');
-  const otherValue = doc(db, 'fxValues', 'other');
 
   comp_threshold.on('change', function(v) {
     Compressor.threshold.value = comp_threshold.value;
-    updateDoc(compValue, { 'comp_threshold': comp_threshold.value });
+    fxValues.comp.threshold = comp_threshold.value;
+    fxValues.whatChanged = 'comp.threshold';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+      console.log("threshold: ", fxValues.comp.threshold);
+    }
   });
 
   comp_release.on('change', function(v) {
     Compressor.release.value = comp_release.value;
-    updateDoc(compValue, { 'comp_release': comp_release.value });
+    fxValues.comp.release = comp_release.value;
+    fxValues.whatChanged = 'comp.release';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
   comp_attack.on('change', function(v) {
     Compressor.attack.value = comp_attack.value;
-    updateDoc(compValue, { 'comp_attack': comp_attack.value });
+    fxValues.comp.attack = comp_attack.value;
+    fxValues.whatChanged = 'comp.attack';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
   comp_knee.on('change', function(v) {
     Compressor.knee.value = comp_knee.value;
-    updateDoc(compValue, {'comp_knee': comp_knee.value });
+    fxValues.comp.knee = comp_knee.value;
+    fxValues.whatChanged = 'comp.knee';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
   comp_ratio.on('change', function(v) {
     Compressor.ratio.value = comp_ratio.value;
-    updateDoc(compValue, { 'comp_ratio': comp_ratio.value });
+    fxValues.comp.ratio = comp_ratio.value;
+    fxValues.whatChanged = 'comp.ratio';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
-
-  comp_reduction.on('change', function(v) {
-    updateDoc(compValue, { 'comp_reduction' : comp_reduction.value });
-  });
-
 
   eq_type.on('change', function(v) {
-    biquadFilter.type = eq_type.value;
-    updateDoc(eqValue, { 'eq_type': eq_type.value });
+    Filter.type = eq_type.value;
+    fxValues.eq.type = eq_type.value;
+    fxValues.whatChanged = 'eq.type';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
   eq_freq.on('change', function(v) {
-    biquadFilter.frequency.value = eq_freq.value;
-    updateDoc(eqValue, { 'eq_freq': eq_freq.value });
+    Filter.frequency.value = eq_freq.value;
+    fxValues.eq.freq = eq_freq.value;
+    fxValues.whatChanged = 'eq.freq';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
   eq1.on('change', function(v) {
-    biquadFilter.gain.value = eq1.value;
-    updateDoc(eqValue, { 'eq1': eq1.value });
+    Filter.gain.value = eq1.value;
+    fxValues.eq.low = eq1.value;
+    fxValues.whatChanged = 'eq.low';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
+  });
+
+  eq2.on('change', function(v) {
+    Filter.gain.value = eq2.value;
+    fxValues.eq.mid = eq2.value;
+    fxValues.whatChanged = 'eq.mid';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
+  });
+
+  eq3.on('change', function(v) {
+    Filter.gain.value = eq3.value;
+    fxValues.eq.high = eq3.value;
+    fxValues.whatChanged = 'eq.high';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
   pan.on('change', function(v) {
     Panner.pan.value = pan.value;
-    updateDoc(otherValue, { 'pan': pan.value });
+    fxValues.pan.pan = pan.value;
+    fxValues.whatChanged = 'pan.pan';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
   gain.on('change', function(v) {
     Gainner.gain.value = gain.value;
-    updateDoc(otherValue, { 'gain': gain.value });
+    fxValues.gain.gain = gain.value;
+    fxValues.whatChanged = 'gain.gain';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
 
   // Bypass function
   comp_bypass.on('change', function(v) {
-    updateDoc(compValue, { 'comp_bypass' : comp_bypass.state });
     if(comp_bypass.state == true) {
       Compressor.disconnect();
-      source.connect(biquadFilter);
-      biquadFilter.connect(Gainner);
-      Gainner.connect(Panner);
-      Panner.connect(audioCtx.destination);
+      source.connect(Filter);
     } else {
+      source.disconnect(Filter);
       source.connect(Compressor);
-      Compressor.connect(biquadFilter);
-      biquadFilter.connect(Gainner);
-      Gainner.connect(Panner);
-      Panner.connect(audioCtx.destination);
+      Compressor.connect(Filter);
+    }
+    fxValues.comp.bypass = comp_bypass.state;
+    fxValues.whatChanged = 'comp.bypass';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
     }
   });
 
   eq_bypass.on('change', function(v) {
-    updateDoc(eqValue, { 'eq_bypass' : eq_bypass.state });
     if(eq_bypass.state == true) {
-      biquadFilter.disconnect();
-      source.connect(Compressor);
+      Filter.disconnect();
       Compressor.connect(Gainner);
-      Gainner.connect(Panner);
-      Panner.connect(audioCtx.destination);
     } else {
-      source.connect(Compressor);
-      Compressor.connect(biquadFilter);
-      biquadFilter.connect(Gainner);
-      Gainner.connect(Panner);
-      Panner.connect(audioCtx.destination);
+      Compressor.disconnect(Gainner);
+      Compressor.connect(Filter);
+      Filter.connect(Gainner);
+    }
+    fxValues.eq.bypass = eq_bypass.state;
+    fxValues.whatChanged = 'eq.bypass';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
     }
   });
 
   gain_bypass.on('change', function(v) {
-    updateDoc(otherValue, { 'gain_bypass' : gain_bypass.state });
     if(gain_bypass.state == true) {
       Gainner.disconnect();
-      source.connect(Compressor);
-      Compressor.connect(biquadFilter);
-      biquadFilter.connect(Panner);
-      Panner.connect(audioCtx.destination);
+      Filter.connect(Panner);
     } else {
-      source.connect(Compressor);
-      Compressor.connect(biquadFilter);
-      biquadFilter.connect(Gainner);
+      Filter.disconnect(Panner);
+      Filter.connect(Gainner);
       Gainner.connect(Panner);
-      Panner.connect(audioCtx.destination);
+    }
+    fxValues.gain.bypass = gain_bypass.state;
+    fxValues.whatChanged = 'gain.bypass';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
     }
   });
 
   pan_bypass.on('change', function(v) {
-    updateDoc(otherValue, { 'pan_bypass' : pan_bypass.state });
     if(pan_bypass.state == true) {
       Panner.disconnect();
-      source.connect(Compressor);
-      Compressor.connect(biquadFilter);
-      biquadFilter.connect(Gainner);
       Gainner.connect(audioCtx.destination);
     } else {
-      source.connect(Compressor);
-      Compressor.connect(biquadFilter);
-      biquadFilter.connect(Gainner);
+      Gainner.disconnect(audioCtx.destination);
       Gainner.connect(Panner);
       Panner.connect(audioCtx.destination);
+    }
+    fxValues.pan.bypass = pan_bypass.state;
+    fxValues.whatChanged = 'pan.bypass';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
     }
   });
 
@@ -745,77 +937,16 @@ testButton.onclick = async () => {
 
 };
 
-function preferCodec(codecs, mimeType) {
-  let otherCodecs = [];
-  let sortedCodecs = [];
-  let count = codecs.length;
-  codecs.forEach(codec => {
-    if (codec.mimeType === mimeType) {
-      sortedCodecs.push(codec);
-    } else {
-      otherCodecs.push(codec);
-    }
-  });
-  return sortedCodecs.concat(otherCodecs);
-}
-
-
-
-
-
-// Some other examples
-// read
-// const citiesRef = collection(db, "cities");
-
-// await setDoc(doc(citiesRef, "SF"), {
-//     name: "San Francisco", state: "CA", country: "USA",
-//     capital: false, population: 860000,
-//     regions: ["west_coast", "norcal"] });
-// await setDoc(doc(citiesRef, "LA"), {
-//     name: "Los Angeles", state: "CA", country: "USA",
-//     capital: false, population: 3900000,
-//     regions: ["west_coast", "socal"] });
-// await setDoc(doc(citiesRef, "DC"), {
-//     name: "Washington, D.C.", state: null, country: "USA",
-//     capital: true, population: 680000,
-//     regions: ["east_coast"] });
-// await setDoc(doc(citiesRef, "TOK"), {
-//     name: "Tokyo", state: null, country: "Japan",
-//     capital: true, population: 9000000,
-//     regions: ["kanto", "honshu"] });
-// await setDoc(doc(citiesRef, "BJ"), {
-//     name: "Beijing", state: null, country: "China",
-//     capital: true, population: 21500000,
-//     regions: ["jingjinji", "hebei"] });
-
-// query 1
-// const docRef = doc(db, "cities", "SF");
-// const docSnap = await getDoc(docRef);
-
-// if (docSnap.exists()) {
-//   console.log("Document data: ", docSnap.data());
-// } else {
-//   console.log("No such document!");
-// }
-
-// query 2, remove 'where' to get all documents
-// const q = query(collection(db, "cities"), where("capital", "==", true));
-// const querySnapshot = await getDocs(q);
-// querySnapshot.forEach((doc) => {
-//   console.log(doc.id, " => ", doc.data());
-// });
-
-// query 3, listen to the change
-// const unsub = onSnapshot(doc(db, "cities", "SF"), (doc) => {
-//   console.log("Current data: ", doc.data());
-// });
-
-// query 4, listen to the change of whole document
-// const q = query(collection(db, "cities"), where("state", "==", "CA"));
-// const unsubscribe = onSnapshot(q, (querySnapshot) => {
-//   const cities = [];
-//   querySnapshot.forEach((doc) => {
-//     cities.push(doc.data().name);
+// function preferCodec(codecs, mimeType) {
+//   let otherCodecs = [];
+//   let sortedCodecs = [];
+//   let count = codecs.length;
+//   codecs.forEach(codec => {
+//     if (codec.mimeType === mimeType) {
+//       sortedCodecs.push(codec);
+//     } else {
+//       otherCodecs.push(codec);
+//     }
 //   });
-//   console.log("Current cities in CA: ", cities.join(", "));
-// });
+//   return sortedCodecs.concat(otherCodecs);
+// }
