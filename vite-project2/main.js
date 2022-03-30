@@ -32,6 +32,10 @@ const pc = new RTCPeerConnection(servers);
 let localStream = null;
 let remoteStream = null;
 let sender = null;
+const start = Date.now();
+let millisecs = 0;
+// check status of the peerConnection
+stateCheck(pc);
 
 // HTML elements
 const webcamButton = document.getElementById('webcamButton');
@@ -294,10 +298,6 @@ audioOutputSelect.onchange = changeAudioDestination;
 
 
 
-
-
-
-
 // Step 3. setup media sources
 webcamButton.onclick = async () => {
   localStream = await navigator.mediaDevices.getUserMedia(constraints1);
@@ -457,9 +457,11 @@ callButton.onclick = async () => {
     }
     receiveChannel.onopen = e => {
       console.log("receive channel opened");
+      checkTime();
     }
     receiveChannel.onclose = e => {
       console.log("receive channel closed");
+      checkTime();
     }
   }
 
@@ -479,11 +481,14 @@ callButton.onclick = async () => {
       addDoc(offerCandidates, event.candidate.toJSON());
     }
     console.log("PA updated candidates in database");
+    checkTime();
   };
 
   const offerDescription = await pc.createOffer().then(console.log("PA created offer"));
+  checkTime();
   offerDescription.sdp = offerDescription.sdp.replace('useinbandfec=1', 'useinbandfec=1; stereo=1; maxaveragebitrate=510000');
   await pc.setLocalDescription(offerDescription).then(console.log("PA set local desc"));
+  checkTime();
 
   const offer = {
     sdp: offerDescription.sdp,
@@ -491,15 +496,19 @@ callButton.onclick = async () => {
   };
 
   await setDoc(doc(db, 'calls1', callRef.id), {offer}).then(console.log("PA updated offer in database"));
+  checkTime();
 
   // Listen for remote answer
   const q1 = query(doc(db, 'calls1', callRef.id));
   onSnapshot(q1, (snapshot) => {
     const data = snapshot.data();
     if (!pc.currentRemoteDescription && data?.answer) {
+      console.log("listen to answer triggered");
+      checkTime();
       const answerDescription = new RTCSessionDescription(data.answer);
       pc.setRemoteDescription(answerDescription);
-      console.log("PA set remote desc");
+      console.log("PA set remote desc", answerDescription);
+      checkTime();
     }
   });
 
@@ -508,9 +517,12 @@ callButton.onclick = async () => {
   onSnapshot(q2, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
       if (change.type === 'added') {
-        const candidate = new RTCIceCandidate(change.doc.data());
-        pc.addIceCandidate(candidate);
-        // console.log("a, connection: added candidate in local connection");
+        console.log("listen to answerCandidates triggered");
+        checkTime();
+        const candi = new RTCIceCandidate(change.doc.data());
+        pc.addIceCandidate(candi);
+        console.log("PA added ICE Candi: ", candi);
+        checkTime();
       }
     });
   });
@@ -620,9 +632,11 @@ answerButton.onclick = async () => {
     }
     receiveChannel.onopen = e => {
       console.log("receive channel opened");
+      checkTime();
     }
     receiveChannel.onclose = e => {
       console.log("receive channel closed");
+      checkTime();
     }
   }
 
@@ -638,6 +652,7 @@ answerButton.onclick = async () => {
   pc.onicecandidate = (event) => {
     event.candidate && addDoc(answerCandidates, event.candidate.toJSON());
     console.log("PB updated candidate in database");
+    checkTime();
   };
 
   const callData = (await getDoc(doc(callDoc, callId))).data();
@@ -645,11 +660,13 @@ answerButton.onclick = async () => {
   const offerDescription = callData.offer;
   await pc.setRemoteDescription(new RTCSessionDescription(offerDescription));
   console.log("PB set remote desc");
+  checkTime();
 
   const answerDescription = await pc.createAnswer();
   answerDescription.sdp = answerDescription.sdp.replace('useinbandfec=1', 'useinbandfec=1; stereo=1; maxaveragebitrate=510000');
   await pc.setLocalDescription(answerDescription);
   console.log("PB set local desc");
+  checkTime();
 
   const answer = {
     type: answerDescription.type,
@@ -658,13 +675,17 @@ answerButton.onclick = async () => {
 
   await updateDoc(doc(db, 'calls1', callId), { answer });
   console.log("PB updated answer in database");
+  checkTime();
 
   const q3 = query(offerCandidates);
   onSnapshot(q3, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
       if (change.type === 'added') {
         let data = change.doc.data();
-        pc.addIceCandidate(new RTCIceCandidate(data));
+        let candi = new RTCIceCandidate(data);
+        pc.addIceCandidate(candi);
+        console.log("PB added ICE Candi: ", candi);
+        checkTime();
       }
     });
   });
@@ -712,7 +733,21 @@ async function fxFunctions () {
     fxValues.whatChanged = 'comp.threshold';
     if(!receiveHandle) {
       const buffer = JSON.stringify(fxValues);
-      sendChannel.send(buffer);
+      try {
+        sendChannel.send(buffer);
+      } catch(error) {
+        console.error(error);
+        console.log("datachannel ready state", sendChannel.readyState);
+        console.log("ice gathering state", pc.iceGatheringState);
+        console.log("ice connection state", pc.iceConnectionState);
+        console.log("connection state", pc.connectionState);
+      } finally {
+        console.log("sent");
+        console.log("datachannel ready state", sendChannel.readyState);
+        console.log("ice gathering state", pc.iceGatheringState);
+        console.log("ice connection state", pc.iceConnectionState);
+        console.log("connection state", pc.connectionState);
+      }
       console.log("threshold: ", fxValues.comp.threshold);
     }
   });
@@ -950,3 +985,23 @@ async function fxFunctions () {
 //   });
 //   return sortedCodecs.concat(otherCodecs);
 // }
+
+function stateCheck (pc) {
+  pc.onicegatheringstatechange = e => {
+    console.log("iceGatheringState: ", pc.iceGatheringState);
+    checkTime();
+  }
+  pc.oniceconnectionstatechange = e => {
+    console.log("iceConnectionState: ", pc.iceConnectionState);
+    checkTime();
+  }
+  pc.onconnectionstatechange = e => {
+    console.log("connectionState: ", pc.connectionState);
+    checkTime();
+  }
+}
+
+function checkTime() {
+  millisecs = Math.floor(Date.now() % 100000);
+  console.log("time elapsed: ", millisecs);
+}
