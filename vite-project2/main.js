@@ -31,6 +31,7 @@ const servers = {
 const pc = new RTCPeerConnection(servers);
 let localStream = null;
 let remoteStream = null;
+let processedStream = null;
 let sender = null;
 const start = Date.now();
 let millisecs = 0;
@@ -130,7 +131,7 @@ var comp_release = new Nexus.Dial('#comp_release', {
   'value': 0.25
 });
 var comp_bypass = new Nexus.Toggle('#comp_bypass');
-var reverb = new Nexus.Dial('#reverb', {
+var rev_mix = new Nexus.Dial('#reverb', {
   'size': [50, 50],
   'interaction': 'radial',
   'mode': 'relative',
@@ -210,6 +211,10 @@ var fxValues = {
     ratio: comp_ratio.value,
     release: comp_release.value,
     threshold: comp_threshold.value
+  },
+  rev: {
+    mix: rev_mix.value,
+    bypass: rev_bypass.state
   },
   eq: {
     low: eq1.value,
@@ -303,8 +308,11 @@ webcamButton.onclick = async () => {
   localStream = await navigator.mediaDevices.getUserMedia(constraints1);
   remoteStream = new MediaStream();
 
+  // init web audio api
+  await fxFunctions();
+
   // push tracks from local stream to peer connections
-  localStream.getTracks().forEach((track) => {
+  processedStream.getTracks().forEach((track) => {
     pc.addTrack(track, localStream);
   });
 
@@ -314,7 +322,7 @@ webcamButton.onclick = async () => {
     });
   };
 
-  // webcamVideo.srcObject = localStream;
+  webcamVideo.srcObject = processedStream;
   remoteVideo.srcObject = remoteStream;
   webcamVideo.play();
   remoteVideo.play();
@@ -322,41 +330,43 @@ webcamButton.onclick = async () => {
   callButton.disabled = false;
   answerButton.disabled = false;
   webcamButton.disabled = true;
-  fxFunctions();
-}
 
-// mute the local monitor signal
-const isMuteMonitor = document.getElementById('muteMonitor');
+  
+  // mute the local monitor signal
+  const isMuteMonitor = document.getElementById('muteMonitor');
 
-if(isMuteMonitor.checked == true) {
-  webcamVideo.muted = true;
-} else {
-  webcamVideo.muted = false;
-}
-
-isMuteMonitor.addEventListener("change", function() {
   if(isMuteMonitor.checked == true) {
     webcamVideo.muted = true;
-    console.log("monitor muted");
   } else {
     webcamVideo.muted = false;
-    console.log("monitor unmuted");
   }
-});
 
-// mute local input
-// function works only when devices started
-const isMuteMe = document.getElementById('muteMe');
-isMuteMe.checked = false;
-isMuteMe.addEventListener("change", function() {
-  if(isMuteMe.checked == true) {
-    localStream.getTracks()[0].enabled = false;
-    console.log("muted me");
-  } else {
-    localStream.getTracks()[0].enabled = true;
-    console.log("unmuted me");
-  }
-});
+  isMuteMonitor.addEventListener("change", function() {
+    if(isMuteMonitor.checked == true) {
+      webcamVideo.muted = true;
+      console.log("monitor muted");
+    } else {
+      webcamVideo.muted = false;
+      console.log("monitor unmuted");
+    }
+  });
+
+  // mute local input
+  // function works only when devices started
+  const isMuteMe = document.getElementById('muteMe');
+  isMuteMe.checked = false;
+  isMuteMe.addEventListener("change", function() {
+    if(isMuteMe.checked == true) {
+      localStream.getTracks()[0].enabled = false;
+      console.log("muted me");
+    } else {
+      localStream.getTracks()[0].enabled = true;
+      console.log("unmuted me");
+    }
+  });
+
+
+}
 
 
 
@@ -392,66 +402,92 @@ callButton.onclick = async () => {
         
         case 'comp.attack':
           await (comp_attack.value = fxValues.comp.attack);
+          receiveHandle = false;
           break;
 
         case 'comp.knee':
           await (comp_knee.value = fxValues.comp.knee);
+          receiveHandle = false;
           break;
 
         case 'comp.ratio':
           await (comp_ratio.value = fxValues.comp.ratio);
+          receiveHandle = false;
           break;
 
         case 'comp.reduction':
           await (comp_recduction.value = fxValues.comp.reduction);
+          receiveHandle = false;
+          break;
+
+        case 'rev.mix':
+          await (rev_mix.value = fxValues.rev.mix);
+          receiveHandle = false;
           break;
 
         case 'eq.type':
           await (eq_type.value = fxValues.eq.type);
+          receiveHandle = false;
           break;
 
         case 'eq.freq':
           await (eq_freq.value = fxValues.eq.freq);
+          receiveHandle = false;
           break;
 
         case 'eq.low':
           await (eq1.value = fxValues.eq.low);
+          receiveHandle = false;
           break;
 
         case 'eq.mid':
           await (eq2.value = fxValues.eq.mid);
+          receiveHandle = false;
           break;
 
         case 'eq.high':
           await (eq3.value = fxValues.eq.high);
+          receiveHandle = false;
           break;
 
         case 'pan.pan':
           await (pan.value = fxValues.pan.pan);
+          receiveHandle = false;
           break;
         
         case 'gain.gain':
           await (gain.value = fxValues.gain.gain);
+          receiveHandle = false;
           break;
 
         case 'comp.bypass':
           await (comp_bypass.state = fxValues.comp.bypass);
+          receiveHandle = false;
+          break;
+
+        case 'rev.bypass':
+          await (rev_bypass.state = fxValues.rev.bypass);
+          receiveHandle = false;
           break;
 
         case 'eq.bypass':
           await (eq_bypass.state = fxValues.eq.bypass);
+          receiveHandle = false;
           break;
 
         case 'gain.bypass':
           await (gain_bypass.state = fxValues.gain.bypass);
+          receiveHandle = false;
           break;
 
         case 'pan.bypass':
           await (pan_bypass.state = fxValues.pan.bypass);
+          receiveHandle = false;
           break;
       
         default:
           console.log("invalid exchanged value");
+          receiveHandle = false;
           break;
       }
     }
@@ -567,62 +603,87 @@ answerButton.onclick = async () => {
         
         case 'comp.attack':
           await (comp_attack.value = fxValues.comp.attack);
+          receiveHandle = false;
           break;
 
         case 'comp.knee':
           await (comp_knee.value = fxValues.comp.knee);
+          receiveHandle = false;
           break;
 
         case 'comp.ratio':
           await (comp_ratio.value = fxValues.comp.ratio);
+          receiveHandle = false;
           break;
 
         case 'comp.reduction':
           await (comp_recduction.value = fxValues.comp.reduction);
+          receiveHandle = false;
+          break;
+
+        case 'rev.mix':
+          await (rev_mix.value = fxValues.rev.mix);
+          receiveHandle = false;
           break;
 
         case 'eq.type':
           await (eq_type.value = fxValues.eq.type);
+          receiveHandle = false;
           break;
 
         case 'eq.freq':
           await (eq_freq.value = fxValues.eq.freq);
+          receiveHandle = false;
           break;
 
         case 'eq.low':
           await (eq1.value = fxValues.eq.low);
+          receiveHandle = false;
           break;
 
         case 'eq.mid':
           await (eq2.value = fxValues.eq.mid);
+          receiveHandle = false;
           break;
 
         case 'eq.high':
           await (eq3.value = fxValues.eq.high);
+          receiveHandle = false;
           break;
 
         case 'pan.pan':
           await (pan.value = fxValues.pan.pan);
+          receiveHandle = false;
           break;
         
         case 'gain.gain':
           await (gain.value = fxValues.gain.gain);
+          receiveHandle = false;
           break;
 
         case 'comp.bypass':
           await (comp_bypass.state = fxValues.comp.bypass);
+          receiveHandle = false;
+          break;
+
+        case 'rev.bypass':
+          await (rev_bypass.state = fxValues.rev.bypass);
+          receiveHandle = false;
           break;
 
         case 'eq.bypass':
           await (eq_bypass.state = fxValues.eq.bypass);
+          receiveHandle = false;
           break;
 
         case 'gain.bypass':
           await (gain_bypass.state = fxValues.gain.bypass);
+          receiveHandle = false;
           break;
 
         case 'pan.bypass':
           await (pan_bypass.state = fxValues.pan.bypass);
+          receiveHandle = false;
           break;
       
         default:
@@ -696,13 +757,15 @@ answerButton.onclick = async () => {
 
 // Step 6. Codec changes
 async function fxFunctions () {
-  console.log('button has been pushed');
 
 
   // Step 7. Apply FX
   // Init FXs
   var audioCtx = new AudioContext();
   var source = audioCtx.createMediaStreamSource(localStream);
+  var dest = audioCtx.createMediaStreamDestination();
+  processedStream = dest.stream;
+  console.log(processedStream);
 
   var Filter = audioCtx.createBiquadFilter();
   Filter.type = eq_type.value;
@@ -718,15 +781,36 @@ async function fxFunctions () {
   var Compressor = audioCtx.createDynamicsCompressor();
   Compressor.release.value = comp_release.value;
 
+  var Convolver = audioCtx.createConvolver();
+
+  var soundSource;
+
+  var ajaxRequest = new XMLHttpRequest();
+
+  ajaxRequest.open('GET', 'https://talker93.github.io/pb/audio/Block%20Inside.wav', true);
+
+  ajaxRequest.responseType = 'arraybuffer';
+  
+  ajaxRequest.onload = function() {
+    var audioData = ajaxRequest.response;
+    audioCtx.decodeAudioData(audioData, function(buffer) {
+        soundSource = audioCtx.createBufferSource();
+        Convolver.buffer = buffer;
+      }, function(e){"Error with decoding audio data" + e.err});
+  }
+  
+  ajaxRequest.send();
+
+
   source.connect(Compressor);
   Compressor.connect(Filter);
-  Filter.connect(Gainner);
+  Filter.connect(Convolver);
+  Convolver.connect(Gainner);
   Gainner.connect(Panner);
-  Panner.connect(audioCtx.destination);
+  Panner.connect(dest);
 
 
   // param listener
-
   comp_threshold.on('change', function(v) {
     Compressor.threshold.value = comp_threshold.value;
     fxValues.comp.threshold = comp_threshold.value;
@@ -737,16 +821,6 @@ async function fxFunctions () {
         sendChannel.send(buffer);
       } catch(error) {
         console.error(error);
-        console.log("datachannel ready state", sendChannel.readyState);
-        console.log("ice gathering state", pc.iceGatheringState);
-        console.log("ice connection state", pc.iceConnectionState);
-        console.log("connection state", pc.connectionState);
-      } finally {
-        console.log("sent");
-        console.log("datachannel ready state", sendChannel.readyState);
-        console.log("ice gathering state", pc.iceGatheringState);
-        console.log("ice connection state", pc.iceConnectionState);
-        console.log("connection state", pc.connectionState);
       }
       console.log("threshold: ", fxValues.comp.threshold);
     }
@@ -786,6 +860,16 @@ async function fxFunctions () {
     Compressor.ratio.value = comp_ratio.value;
     fxValues.comp.ratio = comp_ratio.value;
     fxValues.whatChanged = 'comp.ratio';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
+  });
+
+  rev_mix.on('change', function(v) {
+    // what changes make to Convolver?
+    fxValues.rev.mix = rev_mix.value;
+    fxValues.whatChanged = 'rev.mix';
     if(!receiveHandle) {
       const buffer = JSON.stringify(fxValues);
       sendChannel.send(buffer);
@@ -865,16 +949,19 @@ async function fxFunctions () {
 
   // Bypass function
   comp_bypass.on('change', function(v) {
-    if(comp_bypass.state == true) {
-      Compressor.disconnect();
-      source.connect(Filter);
-    } else {
-      source.disconnect(Filter);
-      source.connect(Compressor);
-      Compressor.connect(Filter);
-    }
     fxValues.comp.bypass = comp_bypass.state;
     fxValues.whatChanged = 'comp.bypass';
+    setBypass();
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
+  });
+  
+  rev_bypass.on('change', function(v) {
+    fxValues.rev.bypass = rev_bypass.state;
+    fxValues.whatChanged = 'rev.bypass';
+    setBypass();
     if(!receiveHandle) {
       const buffer = JSON.stringify(fxValues);
       sendChannel.send(buffer);
@@ -882,16 +969,9 @@ async function fxFunctions () {
   });
 
   eq_bypass.on('change', function(v) {
-    if(eq_bypass.state == true) {
-      Filter.disconnect();
-      Compressor.connect(Gainner);
-    } else {
-      Compressor.disconnect(Gainner);
-      Compressor.connect(Filter);
-      Filter.connect(Gainner);
-    }
     fxValues.eq.bypass = eq_bypass.state;
     fxValues.whatChanged = 'eq.bypass';
+    setBypass();
     if(!receiveHandle) {
       const buffer = JSON.stringify(fxValues);
       sendChannel.send(buffer);
@@ -899,16 +979,9 @@ async function fxFunctions () {
   });
 
   gain_bypass.on('change', function(v) {
-    if(gain_bypass.state == true) {
-      Gainner.disconnect();
-      Filter.connect(Panner);
-    } else {
-      Filter.disconnect(Panner);
-      Filter.connect(Gainner);
-      Gainner.connect(Panner);
-    }
     fxValues.gain.bypass = gain_bypass.state;
     fxValues.whatChanged = 'gain.bypass';
+    setBypass();
     if(!receiveHandle) {
       const buffer = JSON.stringify(fxValues);
       sendChannel.send(buffer);
@@ -916,22 +989,14 @@ async function fxFunctions () {
   });
 
   pan_bypass.on('change', function(v) {
-    if(pan_bypass.state == true) {
-      Panner.disconnect();
-      Gainner.connect(audioCtx.destination);
-    } else {
-      Gainner.disconnect(audioCtx.destination);
-      Gainner.connect(Panner);
-      Panner.connect(audioCtx.destination);
-    }
     fxValues.pan.bypass = pan_bypass.state;
     fxValues.whatChanged = 'pan.bypass';
+    setBypass();
     if(!receiveHandle) {
       const buffer = JSON.stringify(fxValues);
       sendChannel.send(buffer);
     }
   });
-
 
   var oscilloscope = new Nexus.Oscilloscope('#oScope');
   oscilloscope.connect(source);
@@ -939,7 +1004,32 @@ async function fxFunctions () {
   var spectrogram = new Nexus.Spectrogram('#spec');
   spectrogram.connect(source);
 
+  function setBypass() {
+    Compressor.disconnect();
+    Filter.disconnect();
+    Convolver.disconnect();
+    Gainner.disconnect();
+    Panner.disconnect();
+    let bypassState = [false, fxValues.comp.bypass, fxValues.eq.bypass, fxValues.rev.bypass, fxValues.gain.bypass, fxValues.pan.bypass, false];
+    var i, j;
+    for (i = 0; i < bypassState.length-1; i++) {
+      if(!bypassState[i]) {
+        for (j = i+1; j < bypassState.length; j++) {
+          if(!bypassState[j]) {
+            connectNode(i, j);
+            break;
+          }
+        }
+      }
+    }
+  }
 
+  function connectNode(nodeA, nodeB) {
+    let componentsList = [source, Compressor, Filter, Convolver, Gainner, Panner, dest];
+    componentsList[nodeA].connect(componentsList[nodeB]);
+    // console.log(nodeA, " and ", nodeB, " are connected!");
+    // console.log(fxValues.pan.bypass);
+  }
 
   // console.log(webcamVideo.srcObject);
   // console.log(localStream.getTracks());
