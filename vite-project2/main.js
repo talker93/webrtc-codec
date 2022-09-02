@@ -55,7 +55,7 @@ let receiveHandle = false;
 
 // UI Layer for FX Components
 Nexus.colors.accent = "#2596be";
-Nexus.colors.fill = "#333";
+Nexus.colors.fill = "#fff";
 var muteMonitorToggle = new Nexus.Toggle('#muteMo',{'state':true});
 muteMonitorToggle.on('change', function(v) {
   document.getElementById('muteMonitor').click();
@@ -94,6 +94,10 @@ var comp_threshold = new Nexus.Dial('#comp_threshold', {
   'step': 1,
   'value': -24
 });
+var comp_threshold_val = new Nexus.Number('#comp_threshold_val', {
+  'size': [30, 20]
+});
+comp_threshold_val.link(comp_threshold);
 var comp_knee = new Nexus.Dial('#comp_knee', {
   'size': [50, 50],
   'interaction': 'radial',
@@ -103,6 +107,10 @@ var comp_knee = new Nexus.Dial('#comp_knee', {
   'step': 1,
   'value': 30
 });
+var comp_knee_val = new Nexus.Number('#comp_knee_val', {
+  'size': [30, 20]
+});
+comp_knee_val.link(comp_knee);
 var comp_ratio = new Nexus.Dial('#comp_ratio', {
   'size': [50, 50],
   'interaction': 'radial',
@@ -112,6 +120,10 @@ var comp_ratio = new Nexus.Dial('#comp_ratio', {
   'step': 1,
   'value': 12
 });
+var comp_ratio_val = new Nexus.Number('#comp_ratio_val', {
+  'size': [30, 20]
+});
+comp_ratio_val.link(comp_ratio);
 var comp_attack = new Nexus.Dial('#comp_attack', {
   'size': [50, 50],
   'interaction': 'radial',
@@ -121,6 +133,10 @@ var comp_attack = new Nexus.Dial('#comp_attack', {
   'step': 0.01,
   'value': 0.003
 });
+var comp_attack_val = new Nexus.Number('#comp_attack_val', {
+  'size': [30, 20]
+});
+comp_attack_val.link(comp_attack);
 var comp_release = new Nexus.Dial('#comp_release', {
   'size': [50, 50],
   'interaction': 'radial',
@@ -130,8 +146,16 @@ var comp_release = new Nexus.Dial('#comp_release', {
   'step': 0.05,
   'value': 0.25
 });
+var comp_release_val = new Nexus.Number('#comp_release_val', {
+  'size': [30, 20]
+});
+comp_release_val.link(comp_release);
 var comp_bypass = new Nexus.Toggle('#comp_bypass');
-var rev_mix = new Nexus.Dial('#reverb', {
+var rev_type = new Nexus.Select('rev_type', {
+  'size': [200, 20],
+  'options': ['Block Inside', 'Bottle Hall', 'Cement Blocks 1', 'Cement Blocks 2', 'Chateau de Logne, Outside', 'Conic Long Echo Hall', 'Deep Space', 'Derlon Sanctuary', 'Direct Cabinet N1', 'Direct Cabinet N2']
+});
+var rev_mix = new Nexus.Dial('#rev_mix', {
   'size': [50, 50],
   'interaction': 'radial',
   'mode': 'relative',
@@ -213,6 +237,7 @@ var fxValues = {
     threshold: comp_threshold.value
   },
   rev: {
+    type: rev_type.value,
     mix: rev_mix.value,
     bypass: rev_bypass.state
   },
@@ -312,7 +337,7 @@ webcamButton.onclick = async () => {
   await fxFunctions();
 
   // push tracks from local stream to peer connections
-  processedStream.getTracks().forEach((track) => {
+  localStream.getTracks().forEach((track) => {
     pc.addTrack(track, localStream);
   });
 
@@ -422,6 +447,11 @@ callButton.onclick = async () => {
 
         case 'rev.mix':
           await (rev_mix.value = fxValues.rev.mix);
+          receiveHandle = false;
+          break;
+
+        case 'rev.type':
+          await (rev_type.value = fxValues.rev.type);
           receiveHandle = false;
           break;
 
@@ -626,6 +656,11 @@ answerButton.onclick = async () => {
           receiveHandle = false;
           break;
 
+        case 'rev.type':
+          await (rev_type.value = fxValues.rev.type);
+          receiveHandle = false;
+          break;
+  
         case 'eq.type':
           await (eq_type.value = fxValues.eq.type);
           receiveHandle = false;
@@ -782,25 +817,7 @@ async function fxFunctions () {
   Compressor.release.value = comp_release.value;
 
   var Convolver = audioCtx.createConvolver();
-
-  var soundSource;
-
-  var ajaxRequest = new XMLHttpRequest();
-
-  ajaxRequest.open('GET', 'https://talker93.github.io/pb/audio/Block%20Inside.wav', true);
-
-  ajaxRequest.responseType = 'arraybuffer';
-  
-  ajaxRequest.onload = function() {
-    var audioData = ajaxRequest.response;
-    audioCtx.decodeAudioData(audioData, function(buffer) {
-        soundSource = audioCtx.createBufferSource();
-        Convolver.buffer = buffer;
-      }, function(e){"Error with decoding audio data" + e.err});
-  }
-  
-  ajaxRequest.send();
-
+  setRevParam(rev_type.value).then("rev set success to: ", rev_type.value);
 
   source.connect(Compressor);
   Compressor.connect(Filter);
@@ -870,6 +887,16 @@ async function fxFunctions () {
     // what changes make to Convolver?
     fxValues.rev.mix = rev_mix.value;
     fxValues.whatChanged = 'rev.mix';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
+  });
+
+  rev_type.on('change', function(v) {
+    setRevParam(rev_type.value).then("rev set success to: ", rev_type.value);
+    fxValues.rev.type = rev_type.value;
+    fxValues.whatChanged = 'rev.type';
     if(!receiveHandle) {
       const buffer = JSON.stringify(fxValues);
       sendChannel.send(buffer);
@@ -1029,6 +1056,22 @@ async function fxFunctions () {
     componentsList[nodeA].connect(componentsList[nodeB]);
     // console.log(nodeA, " and ", nodeB, " are connected!");
     // console.log(fxValues.pan.bypass);
+  }
+
+  async function setRevParam(param) {
+    var requestString = 'https://talker93.github.io/pb/audio/'+ param + '.wav';
+    var soundSource;
+    var ajaxRequest = new XMLHttpRequest();
+    ajaxRequest.open('GET', requestString, true);
+    ajaxRequest.responseType = 'arraybuffer';
+    ajaxRequest.onload = function() {
+      var audioData = ajaxRequest.response;
+      audioCtx.decodeAudioData(audioData, function(buffer) {
+          soundSource = audioCtx.createBufferSource();
+          Convolver.buffer = buffer;
+        }, function(e){"Error with decoding audio data" + e.err});
+    }
+    ajaxRequest.send();
   }
 
   // console.log(webcamVideo.srcObject);

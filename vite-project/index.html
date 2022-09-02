@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script src="NexusUI.js"></script>"
+    <script src="NexusUI.js"></script>
     <title>Codec Demo</title>
   </head>
   <body>
@@ -12,7 +12,7 @@
     
     <div>
       <h2>Step 1: initialize your device</h2>
-      <h3>Local Stream Setting</h3>
+      <h3 style="display: none;">Local Stream Setting</h3>
 
       <div class="select">
         <div id="muteMo" style="display: inline-block"></div>
@@ -24,7 +24,7 @@
         <input type="checkbox" id="muteMe" style="display: none" value="yes" checked="true">
         <label>Mute Myself</label>
       </div>
-      <div class="select">
+      <div class="select" style="display: none">
         <label>Audio input source: </label>
         <select id="audioSource"></select>
         <div id="audioSourceSelect" style="display:none"></div>
@@ -34,8 +34,8 @@
         <br>
         <audio id="webcamVideo"  controls></audio>
       </div>
-      <h3>Remote Stream Setting</h3>
-      <div class="select">
+      <div class="select" style="display: none;">
+        <h3>Remote Stream Setting</h3>
         <label>Audio output destination: </label>
         <select id="audioOutput"></select>
         <div id="audioOutputSelect" style="display:none"></div>
@@ -68,26 +68,38 @@
       <div>
         <h3>Compressor</h3>
         <div id="comp_bypass">Bypass</div>
-        <div id="comp_threshold">Threshold</div>
-        <div id="comp_knee">Knee</div>
-        <div id="comp_ratio">Ratio</div>
-        <div id="comp_reduction">Reduction</div>
-        <div id="comp_attack">Attack</div>
-        <div id="comp_release">Release</div>
+        <div id="comp_bypass_val"></div>
+        <div id="comp_hidden">
+          <div id="comp_threshold">Threshold</div>
+          <div id="comp_threshold_val"></div>
+          <div id="comp_knee">Knee</div>
+          <div id="comp_knee_val"></div>
+          <div id="comp_ratio">Ratio</div>
+          <div id="comp_ratio_val"></div>
+          <div id="comp_attack">Attack</div>
+          <div id="comp_attack_val"></div>
+          <div id="comp_release">Release</div>
+          <div id="comp_release_val"></div>
+        </div>
       </div>
       <div>
         <h3>Reverb</h3>
         <div id="rev_bypass">Bypass</div>
-        <div id="reverb"></div>
+        <div id="rev_hidden">
+          <div id="rev_type">Reverb Type</div>
+          <div id="rev_mix">Dry/Wet</div>
+        </div>
       </div>
       <div>
         <h3>EQ</h3>
         <div id="eq_bypass">Bypass</div>
-        <div id="eq_type">Filter Type</div>
-        <div id="eq_freq">Filter Freq</div>
-        <div id="eq1">LowFreq</div>
-        <div id="eq2">MidFreq</div>
-        <div id="eq3">HighFreq</div>
+        <div id="eq_hidden">
+          <div id="eq_type">Filter Type</div>
+          <div id="eq_freq">Filter Freq</div>
+          <div id="eq1">LowFreq</div>
+          <div id="eq2">MidFreq</div>
+          <div id="eq3">HighFreq</div>
+        </div>
       </div>
       <div>
         <h3>Gain</h3>
@@ -105,9 +117,8 @@
       <div id="spec"></div>
     </div>
 
-    <div>
-      <button id="testButton">Test</button>
-    </div>
+
+
     <script type="module" src="/main.js"></script>
   </body>
 </html>

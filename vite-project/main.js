@@ -4,16 +4,16 @@ import './style.css'
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, getDocs, Firestore, doc, setDoc, Timestamp, updateDoc, serverTimestamp, getDoc, where, query, onSnapshot } from "firebase/firestore";
+// import { enableStartButton, disableSendButton, createConnection, onCreateSessionDescriptionError, sendData, closeDataChannels, gotDescription1, gotDescription2, getOtherPc, getName, onIceCandidate, onAddIceCandidateSuccess, onAddIceCandidateError, receiveChannelCallback, onReceiveMessageCallback, onSendChannelStateChange, onReceiveChannelStateChange } from './module.js';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyB7Jkv647eebeqifG6mAHv40fUyfdDRB8k",
-  authDomain: "fireship-demos-ce28a.firebaseapp.com",
-  databaseURL: "https://fireship-demos-ce28a-default-rtdb.firebaseio.com",
-  projectId: "fireship-demos-ce28a",
-  storageBucket: "fireship-demos-ce28a.appspot.com",
-  messagingSenderId: "710932691797",
-  appId: "1:710932691797:web:5838b9fd459ba264af4ddc",
-  measurementId: "G-FNWH5RC87G"
+  apiKey: "AIzaSyBLAS9TSpc8v-273koNVal1Tt1jes7lAQQ",
+  authDomain: "webcodec-64053.firebaseapp.com",
+  projectId: "webcodec-64053",
+  storageBucket: "webcodec-64053.appspot.com",
+  messagingSenderId: "499852745372",
+  appId: "1:499852745372:web:c5d05223a82e7e26c86b59",
+  measurementId: "G-TY670YZV22"
 };
 
 // Initialize Firebase
@@ -31,7 +31,12 @@ const servers = {
 const pc = new RTCPeerConnection(servers);
 let localStream = null;
 let remoteStream = null;
+let processedStream = null;
 let sender = null;
+const start = Date.now();
+let millisecs = 0;
+// check status of the peerConnection
+stateCheck(pc);
 
 // HTML elements
 const webcamButton = document.getElementById('webcamButton');
@@ -41,12 +46,16 @@ const callInput = document.getElementById('callInput');
 const answerButton = document.getElementById('answerButton');
 const remoteVideo = document.getElementById('remoteVideo');
 const hangupButton = document.getElementById('hangupButton');
-const testButton = document.getElementById('testButton');
 const callMessage = document.getElementById('callMessage');
+let sendChannel;
+let receiveChannel;
+let receiveHandle = false;
+
+
 
 // UI Layer for FX Components
 Nexus.colors.accent = "#2596be";
-Nexus.colors.fill = "#333";
+Nexus.colors.fill = "#fff";
 var muteMonitorToggle = new Nexus.Toggle('#muteMo',{'state':true});
 muteMonitorToggle.on('change', function(v) {
   document.getElementById('muteMonitor').click();
@@ -85,6 +94,10 @@ var comp_threshold = new Nexus.Dial('#comp_threshold', {
   'step': 1,
   'value': -24
 });
+var comp_threshold_val = new Nexus.Number('#comp_threshold_val', {
+  'size': [30, 20]
+});
+comp_threshold_val.link(comp_threshold);
 var comp_knee = new Nexus.Dial('#comp_knee', {
   'size': [50, 50],
   'interaction': 'radial',
@@ -94,6 +107,10 @@ var comp_knee = new Nexus.Dial('#comp_knee', {
   'step': 1,
   'value': 30
 });
+var comp_knee_val = new Nexus.Number('#comp_knee_val', {
+  'size': [30, 20]
+});
+comp_knee_val.link(comp_knee);
 var comp_ratio = new Nexus.Dial('#comp_ratio', {
   'size': [50, 50],
   'interaction': 'radial',
@@ -103,15 +120,10 @@ var comp_ratio = new Nexus.Dial('#comp_ratio', {
   'step': 1,
   'value': 12
 });
-var comp_reduction = new Nexus.Dial('#comp_reduction', {
-  'size': [50, 50],
-  'interaction': 'radial',
-  'mode': 'relative',
-  'min': -20,
-  'max': 0,
-  'step': 1,
-  'value': 0
+var comp_ratio_val = new Nexus.Number('#comp_ratio_val', {
+  'size': [30, 20]
 });
+comp_ratio_val.link(comp_ratio);
 var comp_attack = new Nexus.Dial('#comp_attack', {
   'size': [50, 50],
   'interaction': 'radial',
@@ -121,6 +133,10 @@ var comp_attack = new Nexus.Dial('#comp_attack', {
   'step': 0.01,
   'value': 0.003
 });
+var comp_attack_val = new Nexus.Number('#comp_attack_val', {
+  'size': [30, 20]
+});
+comp_attack_val.link(comp_attack);
 var comp_release = new Nexus.Dial('#comp_release', {
   'size': [50, 50],
   'interaction': 'radial',
@@ -130,8 +146,16 @@ var comp_release = new Nexus.Dial('#comp_release', {
   'step': 0.05,
   'value': 0.25
 });
+var comp_release_val = new Nexus.Number('#comp_release_val', {
+  'size': [30, 20]
+});
+comp_release_val.link(comp_release);
 var comp_bypass = new Nexus.Toggle('#comp_bypass');
-var reverb = new Nexus.Dial('#reverb', {
+var rev_type = new Nexus.Select('rev_type', {
+  'size': [200, 20],
+  'options': ['Block Inside', 'Bottle Hall', 'Cement Blocks 1', 'Cement Blocks 2', 'Chateau de Logne, Outside', 'Conic Long Echo Hall', 'Deep Space', 'Derlon Sanctuary', 'Direct Cabinet N1', 'Direct Cabinet N2']
+});
+var rev_mix = new Nexus.Dial('#rev_mix', {
   'size': [50, 50],
   'interaction': 'radial',
   'mode': 'relative',
@@ -202,7 +226,39 @@ var pan = new Nexus.Dial('#pan', {
   'value': 0
 });
 
-
+// for datachannel
+var fxValues = {
+  comp: {
+    attack: comp_attack.value,
+    bypass: comp_bypass.state,
+    knee: comp_knee.value,
+    ratio: comp_ratio.value,
+    release: comp_release.value,
+    threshold: comp_threshold.value
+  },
+  rev: {
+    type: rev_type.value,
+    mix: rev_mix.value,
+    bypass: rev_bypass.state
+  },
+  eq: {
+    low: eq1.value,
+    mid: eq2.value,
+    high: eq3.value,
+    bypass: eq_bypass.state,
+    freq: eq_freq.value,
+    type: eq_type.value
+  },
+  pan: {
+    bypass: pan_bypass.state,
+    pan: pan.value
+  },
+  gain: {
+    bypass: gain_bypass.state,
+    gain: gain.value 
+  },
+  whatChanged: "none"
+};
 
 
 // Step 2. media query
@@ -272,14 +328,13 @@ audioOutputSelect.onchange = changeAudioDestination;
 
 
 
-
-
-
-
 // Step 3. setup media sources
 webcamButton.onclick = async () => {
   localStream = await navigator.mediaDevices.getUserMedia(constraints1);
   remoteStream = new MediaStream();
+
+  // init web audio api
+  await fxFunctions();
 
   // push tracks from local stream to peer connections
   localStream.getTracks().forEach((track) => {
@@ -287,14 +342,12 @@ webcamButton.onclick = async () => {
   });
 
   pc.ontrack = (event) => {
-    console.log('case2');
     event.streams[0].getTracks().forEach((track) => {
-      console.log(track);
       remoteStream.addTrack(track);
     });
   };
 
-  // webcamVideo.srcObject = localStream;
+  webcamVideo.srcObject = processedStream;
   remoteVideo.srcObject = remoteStream;
   webcamVideo.play();
   remoteVideo.play();
@@ -303,50 +356,180 @@ webcamButton.onclick = async () => {
   answerButton.disabled = false;
   webcamButton.disabled = true;
 
+  
+  // mute the local monitor signal
+  const isMuteMonitor = document.getElementById('muteMonitor');
 
-
-}
-
-// mute the local monitor signal
-const isMuteMonitor = document.getElementById('muteMonitor');
-
-if(isMuteMonitor.checked == true) {
-  webcamVideo.muted = true;
-} else {
-  webcamVideo.muted = false;
-}
-
-isMuteMonitor.addEventListener("change", function() {
   if(isMuteMonitor.checked == true) {
     webcamVideo.muted = true;
-    console.log("monitor muted");
   } else {
     webcamVideo.muted = false;
-    console.log("monitor unmuted");
   }
-});
 
-// mute local input
-// function works only when devices started
-const isMuteMe = document.getElementById('muteMe');
-isMuteMe.checked = false;
-isMuteMe.addEventListener("change", function() {
-  if(isMuteMe.checked == true) {
-    localStream.getTracks()[0].enabled = false;
-    console.log("muted me");
-  } else {
-    localStream.getTracks()[0].enabled = true;
-    console.log("unmuted me");
-  }
-});
+  isMuteMonitor.addEventListener("change", function() {
+    if(isMuteMonitor.checked == true) {
+      webcamVideo.muted = true;
+      console.log("monitor muted");
+    } else {
+      webcamVideo.muted = false;
+      console.log("monitor unmuted");
+    }
+  });
+
+  // mute local input
+  // function works only when devices started
+  const isMuteMe = document.getElementById('muteMe');
+  isMuteMe.checked = false;
+  isMuteMe.addEventListener("change", function() {
+    if(isMuteMe.checked == true) {
+      localStream.getTracks()[0].enabled = false;
+      console.log("muted me");
+    } else {
+      localStream.getTracks()[0].enabled = true;
+      console.log("unmuted me");
+    }
+  });
 
 
+}
 
 
 // Step 4. create an offer
 const db = getFirestore();
 
 callButton.onclick = async () => {
+  
+  sendChannel = pc.createDataChannel("sendDataChannel");
+  sendChannel.onopen = e => {
+    console.log("send channel opened");
+  }
+  sendChannel.onclose = e => {
+    console.log("send channel closed");
+  }
+
+  pc.ondatachannel = (event) => {
+    receiveChannel = event.channel;
+    receiveChannel.onmessage = async e => {
+      receiveHandle = true;
+      fxValues = JSON.parse(e.data);
+      switch (fxValues.whatChanged) {
+        case 'comp.threshold':
+          await (comp_threshold.value = fxValues.comp.threshold);
+          receiveHandle = false;
+          break;
+
+        case 'comp.release':
+          await (comp_release.value = fxValues.comp.release);
+          receiveHandle = false;
+          break;
+        
+        case 'comp.attack':
+          await (comp_attack.value = fxValues.comp.attack);
+          receiveHandle = false;
+          break;
+
+        case 'comp.knee':
+          await (comp_knee.value = fxValues.comp.knee);
+          receiveHandle = false;
+          break;
+
+        case 'comp.ratio':
+          await (comp_ratio.value = fxValues.comp.ratio);
+          receiveHandle = false;
+          break;
+
+        case 'comp.reduction':
+          await (comp_recduction.value = fxValues.comp.reduction);
+          receiveHandle = false;
+          break;
+
+        case 'rev.mix':
+          await (rev_mix.value = fxValues.rev.mix);
+          receiveHandle = false;
+          break;
+
+        case 'rev.type':
+          await (rev_type.value = fxValues.rev.type);
+          receiveHandle = false;
+          break;
+
+        case 'eq.type':
+          await (eq_type.value = fxValues.eq.type);
+          receiveHandle = false;
+          break;
+
+        case 'eq.freq':
+          await (eq_freq.value = fxValues.eq.freq);
+          receiveHandle = false;
+          break;
+
+        case 'eq.low':
+          await (eq1.value = fxValues.eq.low);
+          receiveHandle = false;
+          break;
+
+        case 'eq.mid':
+          await (eq2.value = fxValues.eq.mid);
+          receiveHandle = false;
+          break;
+
+        case 'eq.high':
+          await (eq3.value = fxValues.eq.high);
+          receiveHandle = false;
+          break;
+
+        case 'pan.pan':
+          await (pan.value = fxValues.pan.pan);
+          receiveHandle = false;
+          break;
+        
+        case 'gain.gain':
+          await (gain.value = fxValues.gain.gain);
+          receiveHandle = false;
+          break;
+
+        case 'comp.bypass':
+          await (comp_bypass.state = fxValues.comp.bypass);
+          receiveHandle = false;
+          break;
+
+        case 'rev.bypass':
+          await (rev_bypass.state = fxValues.rev.bypass);
+          receiveHandle = false;
+          break;
+
+        case 'eq.bypass':
+          await (eq_bypass.state = fxValues.eq.bypass);
+          receiveHandle = false;
+          break;
+
+        case 'gain.bypass':
+          await (gain_bypass.state = fxValues.gain.bypass);
+          receiveHandle = false;
+          break;
+
+        case 'pan.bypass':
+          await (pan_bypass.state = fxValues.pan.bypass);
+          receiveHandle = false;
+          break;
+      
+        default:
+          console.log("invalid exchanged value");
+          receiveHandle = false;
+          break;
+      }
+    }
+    receiveChannel.onopen = e => {
+      console.log("receive channel opened");
+      checkTime();
+    }
+    receiveChannel.onclose = e => {
+      console.log("receive channel closed");
+      checkTime();
+    }
+  }
+
+
   let callMsg = document.createTextNode("You created a call.");
   callMessage.appendChild(callMsg);
   callButton.disabled = true;
@@ -358,30 +541,38 @@ callButton.onclick = async () => {
   const answerCandidates = collection(db, "calls1", callRef.id, "answerCandidates");
 
   pc.onicecandidate = (event) => {
-    event.candidate && addDoc(offerCandidates, event.candidate.toJSON());
+    if(event.candidate) {
+      addDoc(offerCandidates, event.candidate.toJSON());
+    }
+    console.log("PA updated candidates in database");
+    checkTime();
   };
 
-  const offerDescription = await pc.createOffer();
+  const offerDescription = await pc.createOffer().then(console.log("PA created offer"));
+  checkTime();
   offerDescription.sdp = offerDescription.sdp.replace('useinbandfec=1', 'useinbandfec=1; stereo=1; maxaveragebitrate=510000');
-  await pc.setLocalDescription(offerDescription);
-  console.log("offerdescription from pa", offerDescription);
+  await pc.setLocalDescription(offerDescription).then(console.log("PA set local desc"));
+  checkTime();
 
   const offer = {
     sdp: offerDescription.sdp,
     type: offerDescription.type,
   };
 
-  await setDoc(doc(db, 'calls1', callRef.id), {offer});
-  console.log("offer from pa", offer);
+  await setDoc(doc(db, 'calls1', callRef.id), {offer}).then(console.log("PA updated offer in database"));
+  checkTime();
 
   // Listen for remote answer
   const q1 = query(doc(db, 'calls1', callRef.id));
   onSnapshot(q1, (snapshot) => {
     const data = snapshot.data();
     if (!pc.currentRemoteDescription && data?.answer) {
+      console.log("listen to answer triggered");
+      checkTime();
       const answerDescription = new RTCSessionDescription(data.answer);
       pc.setRemoteDescription(answerDescription);
-      console.log("answerdescription from pa", answerDescription);
+      console.log("PA set remote desc", answerDescription);
+      checkTime();
     }
   });
 
@@ -390,14 +581,19 @@ callButton.onclick = async () => {
   onSnapshot(q2, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
       if (change.type === 'added') {
-        const candidate = new RTCIceCandidate(change.doc.data());
-        pc.addIceCandidate(candidate);
-        console.log("candidate from pa", candidate);
+        console.log("listen to answerCandidates triggered");
+        checkTime();
+        const candi = new RTCIceCandidate(change.doc.data());
+        pc.addIceCandidate(candi);
+        console.log("PA added ICE Candi: ", candi);
+        checkTime();
       }
     });
   });
 
   hangupButton.disabled = false;
+
+
 };
 
 
@@ -408,6 +604,136 @@ callButton.onclick = async () => {
 
 // Step 5. Answer the call with the unique ID
 answerButton.onclick = async () => {
+  
+  sendChannel = pc.createDataChannel("sendDataChannel2");
+  sendChannel.onopen = e => {
+    console.log("send channel opened");
+  }
+  sendChannel.onclose = e => {
+    console.log("send channel closed");
+  }
+
+  pc.ondatachannel = (event) => {
+    receiveChannel = event.channel;
+    receiveChannel.onmessage = async e => {
+      receiveHandle = true;
+      fxValues = JSON.parse(e.data);
+      switch (fxValues.whatChanged) {
+        case 'comp.threshold':
+          await (comp_threshold.value = fxValues.comp.threshold);
+          receiveHandle = false;
+          break;
+
+        case 'comp.release':
+          await (comp_release.value = fxValues.comp.release);
+          receiveHandle = false;
+          break;
+        
+        case 'comp.attack':
+          await (comp_attack.value = fxValues.comp.attack);
+          receiveHandle = false;
+          break;
+
+        case 'comp.knee':
+          await (comp_knee.value = fxValues.comp.knee);
+          receiveHandle = false;
+          break;
+
+        case 'comp.ratio':
+          await (comp_ratio.value = fxValues.comp.ratio);
+          receiveHandle = false;
+          break;
+
+        case 'comp.reduction':
+          await (comp_recduction.value = fxValues.comp.reduction);
+          receiveHandle = false;
+          break;
+
+        case 'rev.mix':
+          await (rev_mix.value = fxValues.rev.mix);
+          receiveHandle = false;
+          break;
+
+        case 'rev.type':
+          await (rev_type.value = fxValues.rev.type);
+          receiveHandle = false;
+          break;
+  
+        case 'eq.type':
+          await (eq_type.value = fxValues.eq.type);
+          receiveHandle = false;
+          break;
+
+        case 'eq.freq':
+          await (eq_freq.value = fxValues.eq.freq);
+          receiveHandle = false;
+          break;
+
+        case 'eq.low':
+          await (eq1.value = fxValues.eq.low);
+          receiveHandle = false;
+          break;
+
+        case 'eq.mid':
+          await (eq2.value = fxValues.eq.mid);
+          receiveHandle = false;
+          break;
+
+        case 'eq.high':
+          await (eq3.value = fxValues.eq.high);
+          receiveHandle = false;
+          break;
+
+        case 'pan.pan':
+          await (pan.value = fxValues.pan.pan);
+          receiveHandle = false;
+          break;
+        
+        case 'gain.gain':
+          await (gain.value = fxValues.gain.gain);
+          receiveHandle = false;
+          break;
+
+        case 'comp.bypass':
+          await (comp_bypass.state = fxValues.comp.bypass);
+          receiveHandle = false;
+          break;
+
+        case 'rev.bypass':
+          await (rev_bypass.state = fxValues.rev.bypass);
+          receiveHandle = false;
+          break;
+
+        case 'eq.bypass':
+          await (eq_bypass.state = fxValues.eq.bypass);
+          receiveHandle = false;
+          break;
+
+        case 'gain.bypass':
+          await (gain_bypass.state = fxValues.gain.bypass);
+          receiveHandle = false;
+          break;
+
+        case 'pan.bypass':
+          await (pan_bypass.state = fxValues.pan.bypass);
+          receiveHandle = false;
+          break;
+      
+        default:
+          console.log("invalid exchanged value");
+          break;
+      }
+    }
+    receiveChannel.onopen = e => {
+      console.log("receive channel opened");
+      checkTime();
+    }
+    receiveChannel.onclose = e => {
+      console.log("receive channel closed");
+      checkTime();
+    }
+  }
+
   let callMsg = document.createTextNode("You answered a call!");
   callMessage.appendChild(callMsg);
   callButton.disabled = true;
@@ -419,18 +745,22 @@ answerButton.onclick = async () => {
 
   pc.onicecandidate = (event) => {
     event.candidate && addDoc(answerCandidates, event.candidate.toJSON());
+    console.log("PB updated candidate in database");
+    checkTime();
   };
 
   const callData = (await getDoc(doc(callDoc, callId))).data();
-  console.log(callData);
 
   const offerDescription = callData.offer;
   await pc.setRemoteDescription(new RTCSessionDescription(offerDescription));
+  console.log("PB set remote desc");
+  checkTime();
 
   const answerDescription = await pc.createAnswer();
   answerDescription.sdp = answerDescription.sdp.replace('useinbandfec=1', 'useinbandfec=1; stereo=1; maxaveragebitrate=510000');
   await pc.setLocalDescription(answerDescription);
-  console.log("answerDescription from pb", answerDescription);
+  console.log("PB set local desc");
+  checkTime();
 
   const answer = {
     type: answerDescription.type,
@@ -438,14 +768,18 @@ answerButton.onclick = async () => {
   };
 
   await updateDoc(doc(db, 'calls1', callId), { answer });
-  console.log("answer from pb", answer);
+  console.log("PB updated answer in database");
+  checkTime();
 
   const q3 = query(offerCandidates);
   onSnapshot(q3, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
       if (change.type === 'added') {
         let data = change.doc.data();
-        pc.addIceCandidate(new RTCIceCandidate(data));
+        let candi = new RTCIceCandidate(data);
+        pc.addIceCandidate(candi);
+        console.log("PB added ICE Candi: ", candi);
+        checkTime();
       }
     });
   });
@@ -455,17 +789,20 @@ answerButton.onclick = async () => {
 
 
 // Step 6. Codec changes
-testButton.onclick = async () => {
-  console.log('button has been pushed');
+async function fxFunctions () {
 
   // Step 7. Apply FX
+  // Init FXs
   var audioCtx = new AudioContext();
   var source = audioCtx.createMediaStreamSource(localStream);
+  var dest = audioCtx.createMediaStreamDestination();
+  processedStream = dest.stream;
+  console.log(processedStream);
 
-  var biquadFilter = audioCtx.createBiquadFilter();
-  biquadFilter.type = eq_type.value;
-  biquadFilter.frequency.value = eq_freq.value;
-  biquadFilter.gain.value = gain.value;
+  var Filter = audioCtx.createBiquadFilter();
+  Filter.type = eq_type.value;
+  Filter.frequency.value = eq_freq.value;
+  Filter.gain.value = gain.value;
 
   var Panner = audioCtx.createStereoPanner();
   Panner.pan.value = pan.value;
@@ -476,123 +813,238 @@ testButton.onclick = async () => {
   var Compressor = audioCtx.createDynamicsCompressor();
   Compressor.release.value = comp_release.value;
 
+  var Convolver = audioCtx.createConvolver();
+  setRevParam(rev_type.value).then("rev set success to: ", rev_type.value);
+
   source.connect(Compressor);
-  Compressor.connect(biquadFilter);
-  biquadFilter.connect(Gainner);
+  Compressor.connect(Filter);
+  Filter.connect(Convolver);
+  Convolver.connect(Gainner);
   Gainner.connect(Panner);
-  Panner.connect(audioCtx.destination);
+  Panner.connect(dest);
 
 
-  // param function
+  // param listener
   comp_threshold.on('change', function(v) {
+    Compressor.threshold.value = comp_threshold.value;
+    fxValues.comp.threshold = comp_threshold.value;
+    fxValues.whatChanged = 'comp.threshold';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      try {
+        sendChannel.send(buffer);
+      } catch(error) {
+        console.error(error);
+      }
+      console.log("threshold: ", fxValues.comp.threshold);
+    }
+  });
+
+  comp_release.on('change', function(v) {
     Compressor.release.value = comp_release.value;
-    console.log(comp_release);
+    fxValues.comp.release = comp_release.value;
+    fxValues.whatChanged = 'comp.release';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
   comp_attack.on('change', function(v) {
     Compressor.attack.value = comp_attack.value;
+    fxValues.comp.attack = comp_attack.value;
+    fxValues.whatChanged = 'comp.attack';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
   comp_knee.on('change', function(v) {
     Compressor.knee.value = comp_knee.value;
+    fxValues.comp.knee = comp_knee.value;
+    fxValues.whatChanged = 'comp.knee';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
   comp_ratio.on('change', function(v) {
     Compressor.ratio.value = comp_ratio.value;
+    fxValues.comp.ratio = comp_ratio.value;
+    fxValues.whatChanged = 'comp.ratio';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
+  rev_mix.on('change', function(v) {
+    // what changes make to Convolver?
+    fxValues.rev.mix = rev_mix.value;
+    fxValues.whatChanged = 'rev.mix';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
+  });
+
+  rev_type.on('change', function(v) {
+    setRevParam(rev_type.value).then("rev set success to: ", rev_type.value);
+    fxValues.rev.type = rev_type.value;
+    fxValues.whatChanged = 'rev.type';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
+  });
 
   eq_type.on('change', function(v) {
-    biquadFilter.type = eq_type.value;
-    console.log(eq_type.value);
+    Filter.type = eq_type.value;
+    fxValues.eq.type = eq_type.value;
+    fxValues.whatChanged = 'eq.type';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
   eq_freq.on('change', function(v) {
-    biquadFilter.frequency.value = eq_freq.value;
-    console.log(eq_freq);
+    Filter.frequency.value = eq_freq.value;
+    fxValues.eq.freq = eq_freq.value;
+    fxValues.whatChanged = 'eq.freq';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
   eq1.on('change', function(v) {
-    biquadFilter.gain.value = eq1.value;
-    console.log(eq1.value);
+    Filter.gain.value = eq1.value;
+    fxValues.eq.low = eq1.value;
+    fxValues.whatChanged = 'eq.low';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
+  });
+
+  eq2.on('change', function(v) {
+    Filter.gain.value = eq2.value;
+    fxValues.eq.mid = eq2.value;
+    fxValues.whatChanged = 'eq.mid';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
+  });
+
+  eq3.on('change', function(v) {
+    Filter.gain.value = eq3.value;
+    fxValues.eq.high = eq3.value;
+    fxValues.whatChanged = 'eq.high';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
   pan.on('change', function(v) {
     Panner.pan.value = pan.value;
-    console.log(pan.value);
+    fxValues.pan.pan = pan.value;
+    fxValues.whatChanged = 'pan.pan';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
   gain.on('change', function(v) {
     Gainner.gain.value = gain.value;
-    console.log(gain.value);
+    fxValues.gain.gain = gain.value;
+    fxValues.whatChanged = 'gain.gain';
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
   });
 
 
   // Bypass function
   comp_bypass.on('change', function(v) {
-    if(comp_bypass.state == true) {
-      Compressor.disconnect();
-      source.connect(biquadFilter);
-      biquadFilter.connect(Gainner);
-      Gainner.connect(Panner);
-      Panner.connect(audioCtx.destination);
+    fxValues.comp.bypass = comp_bypass.state;
+    fxValues.whatChanged = 'comp.bypass';
+    setBypass();
+
+    if(comp_bypass.state==true) {
+      const comp_hidden = document.getElementById("comp_hidden");
+      comp_hidden.style = "display: none";
     } else {
-      source.connect(Compressor);
-      Compressor.connect(biquadFilter);
-      biquadFilter.connect(Gainner);
-      Gainner.connect(Panner);
-      Panner.connect(audioCtx.destination);
+      comp_hidden.style = "";
+    }
+
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
+    }
+  });
+  
+  rev_bypass.on('change', function(v) {
+    fxValues.rev.bypass = rev_bypass.state;
+    fxValues.whatChanged = 'rev.bypass';
+    setBypass();
+
+    if(rev_bypass.state==true) {
+      const rev_hidden = document.getElementById("rev_hidden");
+      rev_hidden.style = "display: none";
+    } else {
+      rev_hidden.style = "";
+    }
+
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
     }
   });
 
   eq_bypass.on('change', function(v) {
-    if(eq_bypass.state == true) {
-      biquadFilter.disconnect();
-      source.connect(Compressor);
-      Compressor.connect(Gainner);
-      Gainner.connect(Panner);
-      Panner.connect(audioCtx.destination);
+    fxValues.eq.bypass = eq_bypass.state;
+    fxValues.whatChanged = 'eq.bypass';
+    setBypass();
+
+    if(eq_bypass.state==true) {
+      const eq_hidden = document.getElementById("eq_hidden");
+      eq_hidden.style = "display: none";
     } else {
-      source.connect(Compressor);
-      Compressor.connect(biquadFilter);
-      biquadFilter.connect(Gainner);
-      Gainner.connect(Panner);
-      Panner.connect(audioCtx.destination);
+      eq_hidden.style = "";
+    }
+
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
     }
   });
 
   gain_bypass.on('change', function(v) {
-    if(gain_bypass.state == true) {
-      Gainner.disconnect();
-      source.connect(Compressor);
-      Compressor.connect(biquadFilter);
-      biquadFilter.connect(Panner);
-      Panner.connect(audioCtx.destination);
-    } else {
-      source.connect(Compressor);
-      Compressor.connect(biquadFilter);
-      biquadFilter.connect(Gainner);
-      Gainner.connect(Panner);
-      Panner.connect(audioCtx.destination);
+    fxValues.gain.bypass = gain_bypass.state;
+    fxValues.whatChanged = 'gain.bypass';
+    setBypass();
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
     }
   });
 
   pan_bypass.on('change', function(v) {
-    if(pan_bypass.state == true) {
-      Panner.disconnect();
-      source.connect(Compressor);
-      Compressor.connect(biquadFilter);
-      biquadFilter.connect(Gainner);
-      Gainner.connect(audioCtx.destination);
-    } else {
-      source.connect(Compressor);
-      Compressor.connect(biquadFilter);
-      biquadFilter.connect(Gainner);
-      Gainner.connect(Panner);
-      Panner.connect(audioCtx.destination);
+    fxValues.pan.bypass = pan_bypass.state;
+    fxValues.whatChanged = 'pan.bypass';
+    setBypass();
+    if(!receiveHandle) {
+      const buffer = JSON.stringify(fxValues);
+      sendChannel.send(buffer);
     }
   });
-
 
   var oscilloscope = new Nexus.Oscilloscope('#oScope');
   oscilloscope.connect(source);
@@ -600,7 +1052,48 @@ testButton.onclick = async () => {
   var spectrogram = new Nexus.Spectrogram('#spec');
   spectrogram.connect(source);
 
+  function setBypass() {
+    Compressor.disconnect();
+    Filter.disconnect();
+    Convolver.disconnect();
+    Gainner.disconnect();
+    Panner.disconnect();
+    let bypassState = [false, fxValues.comp.bypass, fxValues.eq.bypass, fxValues.rev.bypass, fxValues.gain.bypass, fxValues.pan.bypass, false];
+    var i, j;
+    for (i = 0; i < bypassState.length-1; i++) {
+      if(!bypassState[i]) {
+        for (j = i+1; j < bypassState.length; j++) {
+          if(!bypassState[j]) {
+            connectNode(i, j);
+            break;
+          }
+        }
+      }
+    }
+  }
 
+  function connectNode(nodeA, nodeB) {
+    let componentsList = [source, Compressor, Filter, Convolver, Gainner, Panner, dest];
+    componentsList[nodeA].connect(componentsList[nodeB]);
+    // console.log(nodeA, " and ", nodeB, " are connected!");
+    // console.log(fxValues.pan.bypass);
+  }
+
+  async function setRevParam(param) {
+    var requestString = 'https://talker93.github.io/pb/audio/'+ param + '.wav';
+    var soundSource;
+    var ajaxRequest = new XMLHttpRequest();
+    ajaxRequest.open('GET', requestString, true);
+    ajaxRequest.responseType = 'arraybuffer';
+    ajaxRequest.onload = function() {
+      var audioData = ajaxRequest.response;
+      audioCtx.decodeAudioData(audioData, function(buffer) {
+          soundSource = audioCtx.createBufferSource();
+          Convolver.buffer = buffer;
+        }, function(e){"Error with decoding audio data" + e.err});
+    }
+    ajaxRequest.send();
+  }
 
   // console.log(webcamVideo.srcObject);
   // console.log(localStream.getTracks());
@@ -633,77 +1126,36 @@ testButton.onclick = async () => {
 
 };
 
-function preferCodec(codecs, mimeType) {
-  let otherCodecs = [];
-  let sortedCodecs = [];
-  let count = codecs.length;
-  codecs.forEach(codec => {
-    if (codec.mimeType === mimeType) {
-      sortedCodecs.push(codec);
-    } else {
-      otherCodecs.push(codec);
-    }
-  });
-  return sortedCodecs.concat(otherCodecs);
-}
-
-
-
-
-
-// Some other examples
-// read
-// const citiesRef = collection(db, "cities");
-
-// await setDoc(doc(citiesRef, "SF"), {
-//     name: "San Francisco", state: "CA", country: "USA",
-//     capital: false, population: 860000,
-//     regions: ["west_coast", "norcal"] });
-// await setDoc(doc(citiesRef, "LA"), {
-//     name: "Los Angeles", state: "CA", country: "USA",
-//     capital: false, population: 3900000,
-//     regions: ["west_coast", "socal"] });
-// await setDoc(doc(citiesRef, "DC"), {
-//     name: "Washington, D.C.", state: null, country: "USA",
-//     capital: true, population: 680000,
-//     regions: ["east_coast"] });
-// await setDoc(doc(citiesRef, "TOK"), {
-//     name: "Tokyo", state: null, country: "Japan",
-//     capital: true, population: 9000000,
-//     regions: ["kanto", "honshu"] });
-// await setDoc(doc(citiesRef, "BJ"), {
-//     name: "Beijing", state: null, country: "China",
-//     capital: true, population: 21500000,
-//     regions: ["jingjinji", "hebei"] });
-
-// query 1
-// const docRef = doc(db, "cities", "SF");
-// const docSnap = await getDoc(docRef);
-
-// if (docSnap.exists()) {
-//   console.log("Document data: ", docSnap.data());
-// } else {
-//   console.log("No such document!");
+// function preferCodec(codecs, mimeType) {
+//   let otherCodecs = [];
+//   let sortedCodecs = [];
+//   let count = codecs.length;
+//   codecs.forEach(codec => {
+//     if (codec.mimeType === mimeType) {
+//       sortedCodecs.push(codec);
+//     } else {
+//       otherCodecs.push(codec);
+//     }
+//   });
+//   return sortedCodecs.concat(otherCodecs);
 // }
 
-// query 2, remove 'where' to get all documents
-// const q = query(collection(db, "cities"), where("capital", "==", true));
-// const querySnapshot = await getDocs(q);
-// querySnapshot.forEach((doc) => {
-//   console.log(doc.id, " => ", doc.data());
-// });
+function stateCheck (pc) {
+  pc.onicegatheringstatechange = e => {
+    console.log("iceGatheringState: ", pc.iceGatheringState);
+    checkTime();
+  }
+  pc.oniceconnectionstatechange = e => {
+    console.log("iceConnectionState: ", pc.iceConnectionState);
+    checkTime();
+  }
+  pc.onconnectionstatechange = e => {
+    console.log("connectionState: ", pc.connectionState);
+    checkTime();
+  }
+}
 
-// query 3, listen to the change
-// const unsub = onSnapshot(doc(db, "cities", "SF"), (doc) => {
-//   console.log("Current data: ", doc.data());
-// });
-
-// query 4, listen to the change of whole document
-// const q = query(collection(db, "cities"), where("state", "==", "CA"));
-// const unsubscribe = onSnapshot(q, (querySnapshot) => {
-//   const cities = [];
-//   querySnapshot.forEach((doc) => {
-//     cities.push(doc.data().name);
-//   });
-//   console.log("Current cities in CA: ", cities.join(", "));
-// });
+function checkTime() {
+  millisecs = Math.floor(Date.now() % 100000);
+  console.log("time elapsed: ", millisecs);
+}
